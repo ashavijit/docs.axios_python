@@ -3,7 +3,7 @@ import './global.css';
 import localFont from 'next/font/local';
 
 const domaine = localFont({
-  src: '../fonts/Famosa-RegularDemo.otf',
+  src: '../fonts/Moderat.ttf',
   variable: '--font-domaine',
 });
 
