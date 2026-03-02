@@ -3,6 +3,8 @@ title: "Before vs After"
 description: "See how axios_python compares to standard approaches in pure httpx or requests."
 ---
 
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
 # Before vs After: Real-world Comparisons
 
 `axios_python` is built natively on `httpx`. It does not try to replace it; rather, it aims to provide the missing "application layer" orchestration.
@@ -13,8 +15,8 @@ Here are some real-world examples comparing pure `httpx` or `requests` usage to 
 
 Often, you find yourself repeating the same headers or base URLs across multiple module files.
 
-### Before (`httpx` or `requests`)
-
+<Tabs items={["Before (httpx)", "After (axios_python)"]}>
+  <Tab value="Before (httpx)">
 ```python
 import httpx
 from config import GITHUB_TOKEN
@@ -36,9 +38,8 @@ def star_repo(owner: str, repo: str):
     response = httpx.put(f"https://api.github.com/user/starred/{owner}/{repo}", headers=headers)
     return response.status_code == 204
 ```
-
-### After (`axios_python`)
-
+  </Tab>
+  <Tab value="After (axios_python)">
 ```python
 # api/github.py
 import axios_python
@@ -62,13 +63,15 @@ def fetch_user(username: str):
 def star_repo(owner: str, repo: str):
     return github_api.put(f"/user/starred/{owner}/{repo}").status_code == 204
 ```
+  </Tab>
+</Tabs>
 
 ## 2. Implementing Retries on Failure
 
 Adding robust exponential backoff retries is often a messy mix of `while` loops, `time.sleep()`, and `try/except` blocks.
 
-### Before
-
+<Tabs items={["Before", "After"]}>
+  <Tab value="Before">
 ```python
 import time
 import httpx
@@ -91,9 +94,8 @@ def fetch_flaky_endpoint():
             print(f"Failed. Retrying in {delay}s...")
             time.sleep(delay)
 ```
-
-### After
-
+  </Tab>
+  <Tab value="After">
 ```python
 import axios_python
 from axios_python import ExponentialBackoff
@@ -109,13 +111,15 @@ api = axios_python.create({
 def fetch_flaky_endpoint():
     return api.get("/data").json()
 ```
+  </Tab>
+</Tabs>
 
 ## 3. Request/Response Interception
 
 Sometimes you want to unpack the "data" key from a JSON response automatically across your entire application.
 
-### Before
-
+<Tabs items={["Before", "After"]}>
+  <Tab value="Before">
 ```python
 import httpx
 
@@ -127,9 +131,8 @@ def get_users():
         return payload["data"]
     return payload
 ```
-
-### After (Interceptors)
-
+  </Tab>
+  <Tab value="After">
 ```python
 import axios_python
 
@@ -149,13 +152,15 @@ def get_users():
     # `response.data` is automatically unwrapped
     return api.get("/users").data 
 ```
+  </Tab>
+</Tabs>
 
 ## 4. Hybrid Sync & Async Libraries
 
 If you maintain a library that offers both a matching Sync and Async API, it usually results in massive code duplication.
 
-### Before
-
+<Tabs items={["Before", "After"]}>
+  <Tab value="Before">
 ```python
 import httpx
 
@@ -170,9 +175,8 @@ class SDK:
             resp = await client.get("https://api.org/data")
             return resp.json()
 ```
-
-### After
-
+  </Tab>
+  <Tab value="After">
 ```python
 import axios_python
 
@@ -188,3 +192,5 @@ class SDK:
         response = await self.api.async_get("/data")
         return response.json()
 ```
+  </Tab>
+</Tabs>

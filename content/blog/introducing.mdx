@@ -1,0 +1,103 @@
+---
+title: "Introducing axios_python"
+description: "Why we built a new HTTP client for Python, and how it dramatically improves developer experience."
+date: 2026-03-03
+author: axios_python team
+---
+
+# Introducing axios_python
+
+We are incredibly excited to announce the release of **axios_python** v1.0!
+
+For years, the Python ecosystem has enjoyed some of the most robust, battle-tested HTTP libraries in the world. Libraries like `requests`, `httpx`, and `aiohttp` power millions of applications from simple scripts to massive distributed systems.
+
+But as our applications grew in complexity, we found ourselves writing the same orchestration logic over and over again. We needed retries, we needed global request cancellation, we needed robust interceptors, and we needed unified synchronous and asynchronous interfaces.
+
+In the JavaScript world, [Axios](https://axios-http.com/) solved this problem beautifully. It wasn't just about sending requests; it was about managing the *lifecycle* of a request from end-to-end. We wanted that same elegant, developer-experience-first approach in Python.
+
+So, we built it.
+
+## The Problem with "Just Send It"
+
+When you use a standard transport library, your code often looks like this:
+
+```python
+import httpx
+import time
+
+def fetch_data():
+    headers = {"Authorization": "Bearer token"}
+    
+    for attempt in range(4):
+        try:
+            response = httpx.get("https://api.example.com", headers=headers, timeout=5.0)
+            response.raise_for_status()
+            
+            payload = response.json()
+            if "data" in payload:
+                return payload["data"]
+            return payload
+            
+        except httpx.RequestError as e:
+            if attempt == 3: raise e
+            time.sleep(2 ** attempt)
+```
+
+There's nothing "wrong" with this code, but it intertwines business logic with network resilience, authentication, and parsing. If you have 50 endpoints, you copy-paste this 50 times.
+
+## The axios_python Solution
+
+`axios_python` is built natively on top of `httpx`. It does not reinvent the core transport protocol. Instead, it provides the missing **orchestration layer**.
+
+With `axios_python`, the exact same logic becomes:
+
+```python
+import axios_python
+from axios_python import ExponentialBackoff
+
+# Configure once
+api = axios_python.create({
+    "base_url": "https://api.example.com",
+    "headers": {"Authorization": "Bearer token"},
+    "timeout": 5.0,
+    "max_retries": 3,
+    "retry_strategy": ExponentialBackoff(base=1.0, multiplier=2.0)
+})
+
+# Unwrap data via an interceptor
+api.interceptors.response.use(lambda r: setattr(r, "data", r.json().get("data", r.data)) or r)
+
+# Your business logic stays pristine
+def fetch_data():
+    return api.get("/").data
+```
+
+## First-Class Async Support
+
+We designed `axios_python` to unify Sync and Async development. If you are migrating a legacy Django application to FastAPI, or writing a library that has to support both paradigms, you no longer need two massive copy-pasted classes.
+
+```python
+# Synchronous
+response = api.get("/users")
+
+# Asynchronous (uses the exact same interceptors, middleware, and config!)
+response = await api.async_get("/users")
+```
+
+## What's Next?
+
+We consider v1.0 to be feature-complete for the core orchestration layer. Our focus moving forward will be on:
+
+1. **Expanding the Plugin Ecosystem:** (Official integrations for Redis caching, AWS SigV4 auth, OpenTelemetry tracing).
+2. **Framework Integrations:** First-party lifecycle hooks for FastAPI and Starlette.
+3. **Performance Optimization:** Ensuring the middleware pipeline adds zero measurable overhead to the underlying `httpx` transport.
+
+Try it out today! 
+
+```bash
+pip install axios_python
+```
+
+We can't wait to see what you build.
+
+*— The axios_python Team*

@@ -1,0 +1,99 @@
+---
+title: "Plugin Authoring"
+description: "How to build and distribute custom plugins for axios_python."
+---
+
+# Plugin Authoring Guide
+
+One of the core design goals of `axios_python` is extensibility. We want the community to build integrations for caching, distributed tracing, metric collections, and authentication so developers don't have to rewrite them.
+
+## What is a Plugin?
+
+In `axios_python`, a Plugin is simply a class that implements the `BasePlugin` protocol. When a user registers a plugin via `api.plugin()`, the plugin is assigned an instance of the newly created `AxiosPython` client.
+
+## Building Your First Plugin
+
+Let's build a plugin that calculates the duration of every request and logs it. We'll call it `TimingPlugin`.
+
+```python
+from axios_python.plugins import BasePlugin
+from axios_python import AxiosPython
+import time
+import logging
+
+class TimingPlugin(BasePlugin):
+    """
+    A plugin that intercepts every request and times its duration.
+    """
+    
+    def __init__(self, logger_name: str = "timing_plugin"):
+        # You can accept custom configuration in your plugin's `__init__`
+        self.logger = logging.getLogger(logger_name)
+
+    def attach(self, client: AxiosPython):
+        # 1. This function is called immediately when `.plugin(TimingPlugin())` is invoked 
+        # 2. You have full access to `client` to inject Interceptors or Middleware!
+        
+        # In this case, we need to wrap the *entire* request execution to capture the network time,
+        # so an async middleware is the perfect tool.
+        client.use(self._timing_middleware)
+        
+    async def _timing_middleware(self, ctx, next_fn):
+        start_time = time.monotonic()
+        
+        # Let the rest of the pipeline run
+        response = await next_fn(ctx)
+        
+        # Calculate duration
+        duration_ms = (time.monotonic() - start_time) * 1000
+        
+        method = ctx["method"]
+        url = ctx["url"]
+        
+        self.logger.info(f"[{method}] {url} finished in {duration_ms:.2f}ms")
+        return response
+```
+
+### Usage
+
+Your users can now install and use your plugin instantly.
+
+```python
+import axios_python
+from my_package import TimingPlugin
+
+api = axios_python.create({"base_url": "https://api.github.com"})
+
+# The plugin injects the middleware pipeline immediately
+api.plugin(TimingPlugin())
+
+# This request will be automatically timed and logged!
+api.get("/users/octocat")
+```
+
+## Adding Interceptors via Plugins
+
+Some plugins only need to modify outgoing headers rather than wrapping the whole request. Here's a plugin that adds a static `X-Request-Source` header.
+
+```python
+from axios_python.plugins import BasePlugin
+from axios_python import AxiosPython
+
+class RequestSourcePlugin(BasePlugin):
+    def __init__(self, source_name: str):
+        self.source_name = source_name
+
+    def attach(self, client: AxiosPython):
+        # We don't need middleware for this, just a request interceptor
+        client.interceptors.request.use(self._inject_header)
+
+    def _inject_header(self, config):
+        config["headers"]["X-Request-Source"] = self.source_name
+        return config
+```
+
+## Community Plugins
+
+We encourage you to distribute your plugins on PyPI! We suggest using the naming convention `axios-python-plugin-<name>`.
+
+If you have built an exciting plugin, please submit an issue to our Github repository so we can feature it in the documentation.

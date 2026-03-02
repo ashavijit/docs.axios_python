@@ -3,6 +3,8 @@ title: "Best Practices"
 description: "Guidelines and best practices for using axios_python in production."
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+
 # Best Practices
 
 When building production-ready applications, using HTTP clients securely, reliably, and efficiently is critical. Here are the recommended best practices for using `axios_python`.
@@ -72,8 +74,9 @@ api = axios_python.create({
 })
 ```
 
-> [!WARNING]
-> Only retry idempotent requests (`GET`, `PUT`, `DELETE`, etc). Retrying non-idempotent `POST` requests blindly can lead to duplicate transactions (e.g. charging a user twice).
+<Callout title="Warning" type="warn">
+Only retry idempotent requests (`GET`, `PUT`, `DELETE`, etc). Retrying non-idempotent `POST` requests blindly can lead to duplicate transactions (e.g. charging a user twice).
+</Callout>
 
 ## 4. Unify Async & Sync Logic
 

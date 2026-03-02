@@ -41,33 +41,51 @@ pip install axios_python
 
 Requires Python 3.10+.
 
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Steps } from 'fumadocs-ui/components/steps';
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
 ## Table of Contents
 
-- [Getting Started](/docs/getting-started)
-- [Client API](/docs/client-api)
-- [Interceptors](/docs/interceptors)
-- [Middleware](/docs/middleware)
-- [Retry Mechanisms](/docs/retry)
-- [Request Cancellation](/docs/cancellation)
-- [Plugins System](/docs/plugins)
-- [Error Handling](/docs/error-handling)
-- [Streaming](/docs/streaming)
-- [Best Practices](/docs/best-practices)
-- [Before vs After](/docs/before-vs-after)
+<Cards>
+  <Card title="Getting Started" href="/docs/getting-started" description="Install the library and write your first request." />
+  <Card title="Client API" href="/docs/client-api" description="Deep dive into the core properties of the axios_python client instance." />
+  <Card title="Interceptors" href="/docs/interceptors" description="Mutate requests before they are sent or map responses." />
+  <Card title="Middleware" href="/docs/middleware" description="Powerful async Express-style request wrappers." />
+  <Card title="Retry Mechanisms" href="/docs/retry" description="Keep your app resilient with automatic backoffs." />
+  <Card title="Request Cancellation" href="/docs/cancellation" description="Cancel long running requests with CancelTokens." />
+  <Card title="Plugins System" href="/docs/plugins" description="Easily drop in caching, logging, and auth." />
+  <Card title="Plugin Authoring" href="/docs/plugin-authoring" description="Build and distribute custom plugins for axios_python." />
+  <Card title="Error Handling" href="/docs/error-handling" description="Learn about the robust exception hierarchy." />
+  <Card title="Streaming" href="/docs/streaming" description="Iterate over large file downloads cleanly." />
+  <Card title="Best Practices" href="/docs/best-practices" description="Production guidance for building with axios_python." />
+  <Card title="Before vs After" href="/docs/before-vs-after" description="Real world comparisons to raw httpx and requests." />
+</Cards>
 
 ---
 
 ## Quick Start
 
-### Basic Synchronous Usage
+<Steps>
+### Install the package
 
+Install the package via `pip` natively.
+
+```bash
+pip install axios_python
+```
+
+### Make your first request
+
+<Tabs items={["Synchronous", "Asynchronous"]}>
+<Tab value="Synchronous">
 ```python
 import axios_python
 
-# Zero-setup module level request
+# Option A: Zero-setup module level request
 response = axios_python.get("https://httpbin.org/get", params={"query": "python"})
 
-# Or create an isolated instance with default configuration
+# Option B: Create an isolated instance with default configuration
 api = axios_python.create({
     "base_url": "https://httpbin.org",
     "timeout": 10,
@@ -83,10 +101,10 @@ print(f"Status: {response.status_code}")
 if response.ok:
     print(response.json())
 ```
+</Tab>
 
-### Asynchronous Native
-
-`axios_python` treats async as a first-class citizen. Just prefix method names with `async_`.
+<Tab value="Asynchronous">
+`axios_python` treats async as a first-class citizen. Just use `async_get`, `async_post`, etc.
 
 ```python
 import asyncio
@@ -103,9 +121,15 @@ async def fetch_data():
 
 asyncio.run(fetch_data())
 ```
+</Tab>
+</Tabs>
 
-### File Uploads
+### Handle edge cases
 
+Handle streaming and file uploads identically to familiar requests libraries.
+
+<Tabs items={["File Uploads", "Streaming Responses"]}>
+<Tab value="File Uploads">
 Multipart file uploads are supported out of the box matching the `requests` interface.
 
 ```python
@@ -114,9 +138,8 @@ with open("report.csv", "rb") as f:
     files = {"file": ("report.csv", f, "text/csv")}
     response = axios_python.post("https://httpbin.org/post", files=files)
 ```
-
-### Streaming Responses
-
+</Tab>
+<Tab value="Streaming Responses">
 For large files or continuous data streams, use `stream=True`. The response is exposed as a context manager for both sync and async calls.
 
 ```python
@@ -132,6 +155,9 @@ async with await axios_python.async_get("https://.../stream", stream=True) as re
     async for line in response.aiter_lines():
         print(line)
 ```
+</Tab>
+</Tabs>
+</Steps>
 
 ---
 

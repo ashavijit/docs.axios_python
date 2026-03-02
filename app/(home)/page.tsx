@@ -53,7 +53,7 @@ export default function HomePage() {
             />
             <FeatureCard
               icon={<RefreshCw className="h-7 w-7 text-orange-500" />}
-              title="Built-in Retries"
+              title="Builtin Retries"
               description="Never fail on temporary network hiccups again. Configure exponential backoff with a single property."
             />
             <FeatureCard

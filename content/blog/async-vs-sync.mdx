@@ -1,0 +1,88 @@
+---
+title: "Async vs Sync API Design in Python"
+description: "Why we built a unified API for axios_python and how it benefits developers."
+date: 2026-03-04
+author: axios_python team
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# The Challenge of Async vs Sync in Python
+
+Python's transition into the asynchronous world over the last decade has been nothing short of revolutionary. Frameworks like FastAPI and Starlette have proven that Python can be blistering fast when handling high-concurrency I/O operations.
+
+However, this transition has fractured the ecosystem. 
+
+Libraries either:
+1. Support only synchronous execution (like `requests`).
+2. Support only asynchronous execution (like `aiohttp`).
+3. Support both, but require completely different API surfaces and underlying connection pools (like `httpx.Client` vs `httpx.AsyncClient`).
+
+## The Problem for Library Authors
+
+If you are writing an SDK for a third-party API (let's say, a Stripe or GitHub API wrapper), you are faced with a difficult choice. Do you force your users to use Async? Do you force them to use Sync? 
+
+Most library authors end up writing two identical classes:
+
+```python
+import httpx
+
+class GitHubClient:
+    def get_user(self, username: str):
+        with httpx.Client() as client:
+            return client.get(f"/users/{username}").json()
+
+class AsyncGitHubClient:
+    async def get_user(self, username: str):
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"/users/{username}")
+            return response.json()
+```
+
+This is a maintenance nightmare. Every new endpoint, every new middleware, every new retry logic has to be implemented and tested twice.
+
+## The `axios_python` Philosophy
+
+With `axios_python`, we decided that **the developer experience should be identical** regardless of the environment. 
+
+A single `axios_python` instance holds all of your configuration: base URLs, headers, timeout settings, retry strategies, and the entire middleware/interceptor pipeline. 
+
+<Tabs items={["Synchronous", "Asynchronous"]}>
+<Tab value="Synchronous">
+```python
+import axios_python
+
+api = axios_python.create({"base_url": "https://api.github.com"})
+
+# Standard sync request
+response = api.get("/users/octocat")
+```
+</Tab>
+<Tab value="Asynchronous">
+```python
+import axios_python
+
+api = axios_python.create({"base_url": "https://api.github.com"})
+
+# Standard async request
+response = await api.async_get("/users/octocat")
+```
+</Tab>
+</Tabs>
+
+### How it Works Under the Hood
+
+When you call `api.get()`, `axios_python` runs the request through the synchronous pipeline. When you call `api.async_get()`, it runs the exact same request configuration through the asynchronous pipeline.
+
+<Callout title="Wait, what about Interceptors?" type="info">
+`axios_python` natively detects if an interceptor or middleware is defined as `async def` or a regular `def`. If you are running an asynchronous request, it will flawlessly `await` your async middlewares alongside your sync ones. If you try to run an async middleware in a synchronous request, it will safely execute it in a local event loop automatically!
+</Callout>
+
+This means if you write a custom Logging interceptor, you write it **once** and it works perfectly for both your Django (Sync) and FastAPI (Async) users out of the box.
+
+## Summary
+
+We believe that switching between Sync and Async contexts shouldn't require learning two different libraries or managing two different sets of connection pools. 
+
+`axios_python` unifies the experience, allowing you to easily build SDKs, microservices, and scripts that work seamlessly anywhere.
