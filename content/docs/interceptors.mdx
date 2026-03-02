@@ -1,0 +1,83 @@
+---
+title: "Interceptors"
+description: "Hook into the request and response lifecycle"
+---
+
+# Interceptors
+
+Interceptors allow you to intercept requests or responses before they are handled by `then` or `catch`. They are heavily inspired by Axios interceptors.
+
+You can modify requests before they leave the client, or morph responses before they are returned to the caller.
+
+## Request Interceptors
+
+Request interceptors receive the current `RequestConfig` dictionary. They must return the modified dictionary (or a new one).
+
+```python
+import axios_python
+
+api = axios_python.create({"base_url": "https://api.example.com"})
+
+def add_auth_timestamp(config):
+    import time
+    config["headers"]["X-Timestamp"] = str(int(time.time()))
+    return config
+
+# Register the interceptor
+api.interceptors.request.use(add_auth_timestamp)
+```
+
+## Response Interceptors
+
+Response interceptors receive the `Response` object. They are often used to globally handle data unwrapping or generic error checking.
+
+```python
+def map_response_data(response):
+    # Automatically unwrap nested 'payload' dictionary if it exists
+    data = response.json()
+    if isinstance(data, dict) and "payload" in data:
+        response.data = data["payload"]
+    return response
+
+api.interceptors.response.use(map_response_data)
+```
+
+## Error Handlers
+
+You can also pass a second argument to `use()` acting as an error handler if a previous interceptor in the chain fails.
+
+```python
+def on_error(exception):
+    print("An interceptor failed!", exception)
+    raise exception
+
+api.interceptors.request.use(add_auth_timestamp, on_error)
+```
+
+## Removing Interceptors
+
+The `use()` method returns an ID. You can use this ID to eject the interceptor later.
+
+```python
+my_interceptor = api.interceptors.request.use(lambda c: c)
+
+# Later...
+api.interceptors.request.eject(my_interceptor)
+```
+
+## Async Interceptors
+
+Interceptors can be fully asynchronous natively. `axios-python` detects if your interceptor is a coroutine and `await`s it automatically if you execute an async request.
+
+```python
+import asyncio
+
+async def fetch_token_async(config):
+    await asyncio.sleep(0.1) # Simulate DB lookup
+    config["headers"]["Authorization"] = "Bearer token123"
+    return config
+
+api.interceptors.request.use(fetch_token_async)
+```
+
+> **Warning:** If you register an async interceptor but execute a **synchronous** request (`api.get()`), `axios-python` will raise an error because it cannot await the interceptor from a synchronous context directly.

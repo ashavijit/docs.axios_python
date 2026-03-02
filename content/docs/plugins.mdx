@@ -1,0 +1,88 @@
+---
+title: "Plugins"
+description: "Extending axios-python with Cache, Auth, and Logging"
+---
+
+# Plugins
+
+`axios-python` ships with several first-party plugins for common use-cases that would normally require you to write repetitive interceptors across all your projects.
+
+Plugins must implement the `Plugin` protocol, requiring an `install(client)` method.
+
+You can register plugins on an instance via the `.plugin()` method.
+
+## Built-in Plugins
+
+### Authentication Plugin (`AuthPlugin`)
+
+Automatically injects `Authorization` headers into every outgoing request from that instance. It supports both static tokens and dynamic callback providers (useful if tokens expire and need to be refreshed during runtime).
+
+```python
+from axios_python import AuthPlugin
+import axios_python
+
+api = axios_python.create({"base_url": "https://api.github.com"})
+
+# Static Token Injection (injects `Bearer super-secret-key`)
+api.plugin(AuthPlugin(scheme="Bearer", token="super-secret-key"))
+
+# Dynamic Token Injection
+def get_fresh_token():
+    # Read from environment, file, or a refresh endpoint
+    return retrieve_token()
+
+api.plugin(AuthPlugin(scheme="Bearer", token_provider=get_fresh_token))
+```
+
+### Cache Plugin (`CachePlugin`)
+
+Provides an in-memory TTL (Time-To-Live) cache for `GET` requests to reduce redundant network load. Repeated requests to the exact same URL + Query Params within the TTL window will short-circuit the network entirely.
+
+```python
+from axios_python import CachePlugin
+
+# Cache GET responses for 120 seconds, storing up to 256 unique queries
+api.plugin(CachePlugin(ttl=120, max_size=256))
+
+api.get("/heavy-query") # hits the network
+api.get("/heavy-query") # instantly returns cached Response
+```
+
+### Logger Plugin (`LoggerPlugin`)
+
+Provides standardized `logging` for requests and responses out of the box, mapping perfectly into Python's built-in `logging` module.
+
+```python
+import logging
+from axios_python import LoggerPlugin
+
+logging.basicConfig(level=logging.INFO)
+
+# Will log:
+# INFO:axios_python.logger:--> GET https://httpbin.org/get
+# INFO:axios_python.logger:<-- 200 OK https://httpbin.org/get (data: X bytes)
+api.plugin(LoggerPlugin(level=logging.INFO))
+```
+
+## Creating Custom Plugins
+
+To create your own plugin, simply implement an object with an `install(client: AxiosPython)` method. Inside that method, you can register interceptors or middleware against the attached `client`.
+
+```python
+from axios_python import AxiosPython
+
+class HeaderInjectorPlugin:
+    def __init__(self, headers: dict[str, str]):
+        self.headers = headers
+
+    def install(self, client: AxiosPython) -> None:
+        # Register a request interceptor onto the client
+        def inject_headers(config):
+            for k, v in self.headers.items():
+                config["headers"][k] = v
+            return config
+            
+        client.interceptors.request.use(inject_headers)
+
+api.plugin(HeaderInjectorPlugin({"X-Custom-Client": "v1"}))
+```

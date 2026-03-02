@@ -1,0 +1,78 @@
+---
+title: "Getting Started"
+description: "How to install and begin using axios-python"
+---
+
+# Getting Started
+
+`axios-python` is a developer-experience-first HTTP client for Python, heavily inspired by [Axios](https://axios-http.com/). 
+
+The Python ecosystem has amazing HTTP transport libraries (`requests`, `httpx`, `aiohttp`), but they are often focused purely on sending requests and getting responses. Modern applications need a **network orchestration layer**—features like request lifecycle hooks, middleware, interceptors, isolated client instances, request cancellation, and unified synchronous/asynchronous developer experience. 
+
+`axios-python` brings the elegant, feature-rich Axios model to Python, built natively on top of `httpx`.
+
+## Installation
+
+Install using `pip`:
+
+```bash
+pip install axios-python
+```
+
+Requires Python 3.10+.
+
+## Quick Start
+
+You can use the module-level API for zero-setup requests, exactly like `requests`.
+
+```python
+import axios_python
+
+# Make a simple GET request
+response = axios_python.get("https://httpbin.org/get", params={"query": "python"})
+
+# Check for success
+if response.ok:
+    print(response.json())
+else:
+    print(f"Error {response.status_code}")
+```
+
+### Instance-based Client
+
+For applications connecting to specific APIs, you should create an isolated instance with a dedicated `base_url` and recurring configuration.
+
+```python
+import axios_python
+
+api = axios_python.create({
+    "base_url": "https://api.myapp.com",
+    "timeout": 10,
+    "headers": {
+        "X-App-Client": "MyCLI/1.0",
+        "Content-Type": "application/json"
+    }
+})
+
+# Request to https://api.myapp.com/users
+response = api.get("/users")
+data = response.json()
+```
+
+### Native Async Support
+
+`axios-python` treats async as a first-class citizen. You don't need a separate async client class, just prefix your method names with `async_`.
+
+```python
+import asyncio
+import axios_python
+
+async def fetch_data():
+    api = axios_python.create({"base_url": "https://httpbin.org"})
+    
+    # Non-blocking async call
+    response = await api.async_get("/delay/2")
+    print(response.data)
+
+asyncio.run(fetch_data())
+```

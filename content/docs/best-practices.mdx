@@ -1,0 +1,99 @@
+---
+title: "Best Practices"
+description: "Guidelines and best practices for using axios_python in production."
+---
+
+# Best Practices
+
+When building production-ready applications, using HTTP clients securely, reliably, and efficiently is critical. Here are the recommended best practices for using `axios_python`.
+
+## 1. Always Use Instances
+
+While you can use the module-level methods (`axios_python.get()`), you should almost always create customized instances for different external services.
+
+```python
+# BAD: Mixing configuration for different services globally
+axios_python.get("https://api.github.com/users", headers={"Authorization": "Bearer gh_token"})
+axios_python.post("https://api.stripe.com/charges", headers={"Authorization": "Bearer sk_token"})
+
+#  GOOD: Isolated client instances
+github = axios_python.create({
+    "base_url": "https://api.github.com",
+    "headers": {"Authorization": "Bearer gh_token", "Accept": "application/vnd.github.v3+json"}
+})
+
+stripe = axios_python.create({
+    "base_url": "https://api.stripe.com/v1",
+    "headers": {"Authorization": "Bearer sk_token"}
+})
+
+# Now requests are clean
+github.get("/users/octocat")
+stripe.post("/charges", json={"amount": 2000, "currency": "usd"})
+```
+
+This ensures isolation:
+- Different `base_url` resolution
+- Isolated middleware pipelines
+- Separate connection pools (critical for performance)
+- Distinct authentication contexts
+
+## 2. Set Reasonable Timeouts
+
+Network requests without timeouts can hang indefinitely, bringing down your application threads. `axios_python` defaults to a 30 second timeout.
+
+```python
+# ❌ BAD: No explicit timeout or too long for a critical path
+api = axios_python.create({"base_url": "https://service.local"})
+
+# ✅ GOOD: Explicit, context-aware timeouts
+# E.g. 1 second for connect, 3 seconds for read
+api = axios_python.create({
+    "base_url": "https://service.local",
+    "timeout": 3.0 
+})
+```
+
+You can always override the timeout on a per-request basis for specific slow endpoints.
+
+## 3. Leverage Retries for Idempotent Requests
+
+Temporary network failures happen. Use `RetryStrategy` to make your application resilient against flakiness.
+
+```python
+from axios_python import ExponentialBackoff
+
+api = axios_python.create({
+    "base_url": "https://api.thirdparty.com",
+    # Enable automatic retries
+    "max_retries": 3,
+    # Use exponential backoff to avoid hammering the service
+    "retry_strategy": ExponentialBackoff(base=1.0, multiplier=2.0)
+})
+```
+
+> [!WARNING]
+> Only retry idempotent requests (`GET`, `PUT`, `DELETE`, etc). Retrying non-idempotent `POST` requests blindly can lead to duplicate transactions (e.g. charging a user twice).
+
+## 4. Unify Async & Sync Logic
+
+If your framework allows it (FastAPI, Starlette, Sanic, Quart), prefer the `await api.async_get()` methods. `axios_python` uses a highly efficient underlying transport for async requests.
+
+If you are writing a script or using a synchronous framework (Flask, Django), use the standard `api.get()` methods. You do not need to rewrite your middlewares or interceptors; the pipeline is unified and handles both seamlessly.
+
+## 5. Use CancelTokens for Long Operations
+
+If you kick off a long-running background fetch but the user navigates away or cancels the operation, you should terminate the HTTP connection to save server resources and bandwidth.
+
+```python
+from axios_python import CancelToken
+
+def handle_user_abort():
+    token.cancel("User navigated away")
+
+token = CancelToken()
+try:
+    response = api.get("/reports/large-export.csv", cancel_token=token)
+except axios_python.CancelError:
+    print("Cleanly aborted request")
+```

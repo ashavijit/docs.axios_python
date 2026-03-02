@@ -1,0 +1,76 @@
+---
+title: "Request Cancellation"
+description: "Aborting in-flight requests cleanly"
+---
+
+# Request Cancellation
+
+Long-running requests or slow downloads sometimes need to be cancelled by the user before they complete (e.g., leaving a web page, closing a CLI command, pushing a "Stop" button).
+
+`axios-python` supports request cancellation natively using the `CancelToken` pattern.
+
+## Using Cancel Tokens
+
+To cancel a request, instantiate a `CancelToken`, attach it to the request's configuration, and call `.cancel()` from another thread or async task.
+
+### Example in Sync Context (Threads)
+
+```python
+from axios_python import CancelToken
+import axios_python
+import threading
+import time
+
+token = CancelToken()
+
+def background_fetch():
+    try:
+        # Pass the token down to the request
+        axios_python.get("https://httpbin.org/delay/10", cancel_token=token)
+    except axios_python.CancelError as e:
+        print(f"Request aborted: {e}")
+
+# Start the download in a background thread
+threading.Thread(target=background_fetch).start()
+
+time.sleep(1)
+
+# Main thread decides to cancel the request
+token.cancel(reason="User clicked 'Stop'")
+```
+
+### Example in Async Context (Tasks)
+
+```python
+import asyncio
+from axios_python import CancelToken
+import axios_python
+
+async def main():
+    token = CancelToken()
+    
+    # Fire off the slow request without waiting
+    task = asyncio.create_task(
+        axios_python.async_get("https://.../heavy-download", cancel_token=token)
+    )
+    
+    # Wait half a second, then cancel
+    await asyncio.sleep(0.5)
+    token.cancel("Took too long!")
+    
+    try:
+        await task
+    except axios_python.CancelError as e:
+        print("Cancelled!", e)
+
+asyncio.run(main())
+```
+
+## How it works
+
+The `CancelToken` evaluates cancellation requests continuously:
+1. When the `execute()` event starts.
+2. Inside the retry engine delays.
+3. Before the `Transport` layer invokes the base `.send()` method.
+
+> **Note:** Because the lowest level network sockets are managed by `httpx`, cancelling a token will drop the waiting request logic in `axios-python` and abandon the process, ensuring your application immediately continues executing. However, the physical socket itself might not instantly close until the garbage collector cleans up the abandoned `httpx` task.

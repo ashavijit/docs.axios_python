@@ -1,0 +1,76 @@
+---
+title: "Middleware"
+description: "Express.js style middleware pipeline for requests"
+---
+
+# Middleware Pipeline
+
+While interceptors are great for simple transformations, sometimes you need to completely wrap the execution of a request. For example:
+- Timing how long a request takes from start to finish.
+- Catching ALL exceptions (even network ones) in a single try/catch block.
+- Implementing a cache that short-circuits the network entirely.
+
+For these cases, `axios-python` provides an Express.js-style middleware pipeline.
+
+## Creating Middleware
+
+Middleware is always implemented as an `async` function that takes two arguments:
+1. `config`: The current request configuration dictionary.
+2. `next_fn`: An async function that yields control to the next middleware in the pipeline (or the actual transport if it's the last middleware).
+
+```python
+import time
+
+async def logger_middleware(config, next_fn):
+    print(f"Starting {config.get('method')} to {config.get('url')}")
+    start = time.monotonic()
+    
+    # Yield control to the next layer
+    result = await next_fn(config)
+    
+    elapsed = time.monotonic() - start
+    print(f"Finished in {elapsed:.3f}s with status {result.status_code}")
+    
+    return result
+```
+
+## Registering Middleware
+
+Attach your middleware function directly to your `axios_python` instance using the `.use()` method.
+
+```python
+import axios_python
+
+api = axios_python.create({"base_url": "https://api.myapp.com"})
+api.use(logger_middleware)
+```
+
+## Short-Circuiting the Pipeline
+
+A middleware can choose to *not* call `next_fn`. If it does this, the actual HTTP request will never be sent. This is how the built-in [CachePlugin](/docs/plugins.mdx) works.
+
+```python
+from axios_python import Response
+
+async def mock_router(config, next_fn):
+    if config.get("url") == "/ping":
+        # Return an immediate mock response!
+        return Response(status_code=200, headers={}, data="pong", request=None)
+        
+    # Otherwise, pass it down the chain
+    return await next_fn(config)
+
+api.use(mock_router)
+
+# Will never hit the network
+res = api.get("/ping")
+print(res.text) # "pong"
+```
+
+## Sync vs Async Execution
+
+The middleware pipeline is strictly asynchronous under the hood. 
+- If you call `api.async_get()`, the middleware runs natively.
+- If you call `api.get()`, `axios-python` transparently wraps the async middleware pipeline in a synchronous event-loop bridge using `asyncio.run()`, meaning your async middleware will still execute perfectly fine even during synchronous requests!
+
+> **Note on `stream=True`**: Because synchronous `stream=True` requests must block the main thread to leave the network socket open indefinitely, they are incompatible with the async middleware bridge. You cannot use middleware with `api.get(stream=True)`. Instead, use `await api.async_get(stream=True)`.

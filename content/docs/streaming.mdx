@@ -1,0 +1,79 @@
+---
+title: "Streaming Responses"
+description: "Consuming massive payloads safely"
+---
+
+# Streaming Responses
+
+Normally, `axios-python` pulls the entire response from the network and stores it in memory (inside `response.data`).
+
+If you are downloading a 5GB video file, this will instantly crash your Python process with an `OutOfMemory` exception. Instead, you should stream the response.
+
+## Enabling Streams
+
+To stream a request, pass exactly `stream=True` in the method signature or configuration. Using this flag prevents the client from automatically closing the network socket or loading the payload.
+
+> **Important**: When you use `stream=True`, you *must* use `axios_python` as a context manager (using the `with` keyword) to ensure the network socket cleanly closes when you are done pulling bytes.
+
+## Streaming Synchronously
+
+```python
+import axios_python
+
+chunk_size = 1024 # 1KB
+
+# Wrap the request in a context manager
+with axios_python.get("https://httpbin.org/stream-bytes/50000", stream=True) as response:
+    # Check the headers or status
+    print(f"Status OK? {response.ok}")
+    
+    # Lazily iterate the payload
+    for chunk in response.iter_bytes(chunk_size):
+        print(f"Received chunk! Next 1024 bytes: {len(chunk)}")
+        # Example: file.write(chunk)
+```
+
+## Streaming Asynchronously
+
+If you are inside an async application framework (like FastAPI or Sanic), use the parallel `async with` and `async for` generators!
+
+```python
+import asyncio
+import axios_python
+
+async def download_worker():
+    # Wrap in `async with await`
+    async with await axios_python.async_get("https://httpbin.org/stream-bytes/50000", stream=True) as response:
+        
+        # Pull bytes from the socket asynchronously
+        async for chunk in response.aiter_bytes():
+            # Example: await asyncio_file.write(chunk)
+            print("Received bytes payload asynchronously!")
+
+asyncio.run(download_worker())
+```
+
+## Available Iterators
+
+The `Response` object exposes three distinct sets of iterators depending on exactly how you want your chunks decoded.
+
+For synchronous (`api.get()`):
+- `response.iter_bytes(chunk_size)` -> Yields raw binary chunks.
+- `response.iter_text(chunk_size)` -> Yields decoded UTF-8 string chunks.
+- `response.iter_lines()` -> Yields a decoded string, split along natural `\n` linebreaks.
+
+For asynchronous (`api.async_get()`):
+- `response.aiter_bytes(chunk_size)` 
+- `response.aiter_text(chunk_size)` 
+- `response.aiter_lines()`
+
+## Manually Consuming Streams
+
+If you decide halfway through that you just want the rest of the stream loaded into memory right now, call the `read()` methods.
+
+```python
+with axios_python.get(..., stream=True) as response:
+    # Force loads the remaining payload dynamically!
+    payload = response.read()
+    print(payload)
+```

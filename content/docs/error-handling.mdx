@@ -1,0 +1,83 @@
+---
+title: "Error Handling"
+description: "Handling different HTTP and Network exceptions"
+---
+
+# Error Handling
+
+`axios-python` guarantees that all HTTP, timeout, and custom exceptions will inherit from the base `AxiosPythonError` exception class.
+
+## Exception Hierarchy
+
+The following exceptions are exposed directly inside `axios_python`:
+
+- `AxiosPythonError`: The base class for all exceptions raised by the package.
+- `TimeoutError`: Raised specifically when a request exceeds the configured `timeout` limit (which defaults to 30.0 seconds).
+- `NetworkError`: Raised when the underlying transport socket fails (e.g., DNS resolution failure, connection refused, dropped packets).
+- `CancelError`: Raised when you cancel an in-flight request via a `CancelToken`.
+- `RetryError`: Raised when a `RetryStrategy` has exhausted all available attempts and the final request failed.
+- `InterceptorError`: Raised when a request or response interceptor crashes.
+- `HTTPStatusError`: Raised when you explicitly request it via `response.raise_for_status()`.
+
+## Best Practices (Try/Except)
+
+The ideal way to catch errors is sorting them by most specific to least specific.
+
+```python
+import axios_python
+from axios_python import (
+    TimeoutError, 
+    NetworkError, 
+    RetryError, 
+    CancelError, 
+    HTTPStatusError, 
+    AxiosPythonError
+)
+
+try:
+    response = axios_python.get("https://api.myapp.com/flaky-endpoint")
+    
+    # 🌟 Manually check 4xx / 5xx error codes
+    response.raise_for_status()
+    
+    # If we got here, it's a 2xx success!
+    data = response.json()
+    
+except HTTPStatusError as e:
+    # Safely extract the original HTTP response from the error
+    print(f"Bad status code: {e.response.status_code}")
+    print(f"Server replied: {e.response.text}")
+    
+except TimeoutError:
+    print("Request timed out after waiting too long.")
+    
+except NetworkError:
+    print("Unable to connect to the server entirely.")
+    
+except RetryError as e:
+    # If the retry failed, the last underlying exception is preserved 
+    # under the `e.last_exception` property
+    print("All retry attempts failed. The final error was:", type(e.last_exception))
+    
+except CancelError:
+    print("Request was manually cancelled by a background thread.")
+    
+except AxiosPythonError as e:
+    # Catch-all for things like interceptor errors or logic failures
+    print(f"A general axios-python architecture error occurred: {e}")
+```
+
+## `response.ok` Property
+
+If you don't like throwing exceptions for HTTP statuses (and prefer checking them logically), you can check the boolean `response.ok` property.
+
+```python
+response = axios_python.get("https://httpbin.org/status/404")
+
+if not response.ok:
+    print("Request failed!")
+
+# This is simply a wrapper around:
+if not (200 <= response.status_code < 300):
+   pass
+```

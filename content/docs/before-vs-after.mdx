@@ -1,0 +1,190 @@
+---
+title: "Before vs After"
+description: "See how axios_python compares to standard approaches in pure httpx or requests."
+---
+
+# Before vs After: Real-world Comparisons
+
+`axios_python` is built natively on `httpx`. It does not try to replace it; rather, it aims to provide the missing "application layer" orchestration.
+
+Here are some real-world examples comparing pure `httpx` or `requests` usage to `axios_python`.
+
+## 1. Request Setup and Headers
+
+Often, you find yourself repeating the same headers or base URLs across multiple module files.
+
+### Before (`httpx` or `requests`)
+
+```python
+import httpx
+from config import GITHUB_TOKEN
+
+# Every file that needs to hit Github needs to rebuild this
+def fetch_user(username: str):
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    response = httpx.get(f"https://api.github.com/users/{username}", headers=headers)
+    return response.json()
+
+def star_repo(owner: str, repo: str):
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    response = httpx.put(f"https://api.github.com/user/starred/{owner}/{repo}", headers=headers)
+    return response.status_code == 204
+```
+
+### After (`axios_python`)
+
+```python
+# api/github.py
+import axios_python
+from config import GITHUB_TOKEN
+
+# Define configuration exactly once
+github_api = axios_python.create({
+    "base_url": "https://api.github.com",
+    "headers": {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+})
+
+# usage.py
+from api.github import github_api
+
+def fetch_user(username: str):
+    return github_api.get(f"/users/{username}").json()
+
+def star_repo(owner: str, repo: str):
+    return github_api.put(f"/user/starred/{owner}/{repo}").status_code == 204
+```
+
+## 2. Implementing Retries on Failure
+
+Adding robust exponential backoff retries is often a messy mix of `while` loops, `time.sleep()`, and `try/except` blocks.
+
+### Before
+
+```python
+import time
+import httpx
+
+def fetch_flaky_endpoint():
+    max_retries = 3
+    base_delay = 1.0
+
+    for attempt in range(max_retries + 1):
+        try:
+            response = httpx.get("https://flaky-service.com/data", timeout=5.0)
+            response.raise_for_status()
+            return response.json()
+        except (httpx.RequestError, httpx.HTTPStatusError) as e:
+            if attempt == max_retries:
+                raise e
+            
+            # Simple exponential backoff
+            delay = base_delay * (2 ** attempt)
+            print(f"Failed. Retrying in {delay}s...")
+            time.sleep(delay)
+```
+
+### After
+
+```python
+import axios_python
+from axios_python import ExponentialBackoff
+
+api = axios_python.create({
+    "base_url": "https://flaky-service.com",
+    "timeout": 5.0,
+    "max_retries": 3,
+    "retry_strategy": ExponentialBackoff(base=1.0, multiplier=2.0)
+})
+
+# The engine handles all sleeping, logging, and error catching automatically
+def fetch_flaky_endpoint():
+    return api.get("/data").json()
+```
+
+## 3. Request/Response Interception
+
+Sometimes you want to unpack the "data" key from a JSON response automatically across your entire application.
+
+### Before
+
+```python
+import httpx
+
+def get_users():
+    response = httpx.get("https://api.example.com/users")
+    payload = response.json()
+    # Have to remember to unpack 'data' everywhere
+    if "data" in payload:
+        return payload["data"]
+    return payload
+```
+
+### After (Interceptors)
+
+```python
+import axios_python
+
+api = axios_python.create({"base_url": "https://api.example.com"})
+
+def unwrap_data(response):
+    payload = response.json()
+    if "data" in payload:
+        response.data = payload["data"]
+    return response
+
+# Attach the interceptor once
+api.interceptors.response.use(unwrap_data)
+
+# Everywhere else:
+def get_users():
+    # `response.data` is automatically unwrapped
+    return api.get("/users").data 
+```
+
+## 4. Hybrid Sync & Async Libraries
+
+If you maintain a library that offers both a matching Sync and Async API, it usually results in massive code duplication.
+
+### Before
+
+```python
+import httpx
+
+class SDK:
+    def get_data(self):
+        with httpx.Client() as client:
+            resp = client.get("https://api.org/data")
+            return resp.json()
+
+    async def async_get_data(self):
+        async with httpx.AsyncClient() as client:
+            resp = await client.get("https://api.org/data")
+            return resp.json()
+```
+
+### After
+
+```python
+import axios_python
+
+class SDK:
+    def __init__(self):
+        self.api = axios_python.create({"base_url": "https://api.org"})
+
+    def get_data(self):
+        return self.api.get("/data").json()
+
+    async def async_get_data(self):
+        # Uses the exact same underlying logic, interceptors, and config
+        response = await self.api.async_get("/data")
+        return response.json()
+```
