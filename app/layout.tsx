@@ -12,6 +12,27 @@ const haskoy = localFont({
   variable: '--font-haskoy',
 });
 
+export const metadata = {
+  title: 'axios_python',
+  description: 'Python HTTP Client inspired by Axios',
+  openGraph: {
+    title: 'axios_python',
+    description: 'Python HTTP Client inspired by Axios',
+    url: 'https://docs-axios-python.vercel.app',
+    siteName: 'axios_python',
+    images: [
+      {
+        url: '/logo.png',
+        width: 1200,
+        height: 630,
+        alt: 'axios_python logo',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+};
+
 export default function Layout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="en" className={`${haskoy.variable} ${domaine.variable}`} suppressHydrationWarning>
