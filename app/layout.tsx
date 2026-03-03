@@ -13,6 +13,7 @@ const haskoy = localFont({
 });
 
 export const metadata = {
+  metadataBase: new URL('https://docs-axios-python.vercel.app'),
   title: 'axios_python',
   description: 'Python HTTP Client inspired by Axios',
   openGraph: {
