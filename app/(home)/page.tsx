@@ -86,7 +86,7 @@ export default function HomePage() {
               </div>
               <div className="mx-auto text-xs font-mono text-muted-foreground group-hover:text-foreground transition-colors">example.py</div>
             </div>
-            <div className="p-8 overflow-x-auto text-[15px] font-mono leading-relaxed bg-[#f8f9fa] dark:bg-[#0d1117] text-[#24292f] dark:text-[#c9d1d9]">
+            <div className="p-8 overflow-x-auto text-[15px] font-mono leading-relaxed bg-[#f8f9fa] dark:bg-[#0d1117] text-[#24292f] dark:text-[#c9d1d9] scrollbar-thin scrollbar-thumb-blue-500/20 hover:scrollbar-thumb-blue-500/40 scrollbar-track-transparent">
               <pre>
                 <span className="text-[#cf222e] dark:text-[#ff7b72]">import</span> <span className="text-[#0550ae] dark:text-[#e6edf3]">axios_python</span>
                 <br /><br />
@@ -117,12 +117,28 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Global Styles for Animations */}
+      {/* Global Styles for Animations and Scrollbars */}
       <style>{`
         @keyframes shimmer {
           100% {
             transform: translateX(100%);
           }
+        }
+
+        /* Custom scrollbar for webkit browsers */
+        .scrollbar-thin::-webkit-scrollbar {
+          height: 6px;
+          width: 6px;
+        }
+        .scrollbar-track-transparent::-webkit-scrollbar-track {
+          background-color: transparent;
+        }
+        .scrollbar-thumb-blue-500\\/20::-webkit-scrollbar-thumb {
+          background-color: rgba(59, 130, 246, 0.2);
+          border-radius: 9999px;
+        }
+        .hover\\:scrollbar-thumb-blue-500\\/40:hover::-webkit-scrollbar-thumb {
+          background-color: rgba(59, 130, 246, 0.4);
         }
       `}</style>
     </main>
