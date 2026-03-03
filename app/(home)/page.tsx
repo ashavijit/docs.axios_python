@@ -6,7 +6,7 @@ import Beams from '@/components/Beams';
    Tiny reusable primitives
 ───────────────────────────────────────────── */
 
-function Badge({ children }) {
+function Badge({ children }: { children: React.ReactNode }) {
   return (
     <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/60 px-3 py-1 text-xs font-medium text-zinc-500 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
       {children}
@@ -14,7 +14,7 @@ function Badge({ children }) {
   );
 }
 
-function PingDot({ color = 'bg-zinc-500' }) {
+function PingDot({ color = 'bg-zinc-500' }: { color?: string }) {
   return (
     <span className="flex h-2 w-2 items-center justify-center">
       <span className={`absolute inline-flex h-2 w-2 animate-ping rounded-full ${color} opacity-75`} />
@@ -27,7 +27,7 @@ function PingDot({ color = 'bg-zinc-500' }) {
    Stat chip (hero row)
 ───────────────────────────────────────────── */
 
-function Stat({ value, label }) {
+function Stat({ value, label }: { value: React.ReactNode; label: string }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <span className="text-2xl font-bold tracking-tighter text-zinc-900 dark:text-zinc-50">{value}</span>
@@ -40,17 +40,17 @@ function Stat({ value, label }) {
    Code token helpers
 ───────────────────────────────────────────── */
 
-const K = ({ c }) => <span style={{ color: c }} />;
+const K = ({ c }: { c: string }) => <span style={{ color: c }} />;
 
 /* ─────────────────────────────────────────────
    Feature card
 ───────────────────────────────────────────── */
 
-function FeatureCard({ icon, title, description, accent = '#52525b' }) {
+function FeatureCard({ icon, title, description, accent = '#52525b' }: { icon: React.ReactNode; title: string; description: string; accent?: string }) {
   return (
     <div
       className="group relative flex flex-col gap-5 overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-800/80 dark:bg-zinc-900/40"
-      style={{ '--accent': accent }}
+      style={{ '--accent': accent } as React.CSSProperties}
     >
       {/* top accent line */}
       <div
@@ -77,7 +77,7 @@ function FeatureCard({ icon, title, description, accent = '#52525b' }) {
    Comparison row  (sync vs async)
 ───────────────────────────────────────────── */
 
-function CompareCard({ label, code, good }) {
+function CompareCard({ label, code, good }: { label: string; code: string; good: boolean }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl border p-5 ${good ? 'border-blue-200 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-950/20' : 'border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/30'}`}>
       <div className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${good ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-zinc-200/80 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
