@@ -18,7 +18,6 @@ from axios_python import create, all
 api = create({"base_url": "https://api.github.com"})
 
 async def fetch_dashboard():
-    # Pass a list of un-awaited async calls
     results = await all([
         api.async_get("/users/octocat"),
         api.async_get("/users/octocat/repos")
@@ -56,7 +55,6 @@ async def fetch_dashboard():
         repos = repos_response.json()
         print(f"User {profile['login']} has {len(repos)} public repos.")
 
-    # Call the spread-decorated function passing the raw results list
     render(results)
 
 asyncio.run(fetch_dashboard())

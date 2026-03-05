@@ -1,164 +1,194 @@
 ---
-title: Axios Python
-description: A developer-experience-first HTTP client for Python, heavily inspired by Axios.
+title: axios_python
+description: A developer-experience-first HTTP client for Python, heavily inspired by Axios. Built on httpx with interceptors, middleware, retries, and full async support.
 ---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { TypeTable } from 'fumadocs-ui/components/type-table';
 
 # axios_python
 
-[![PyPI version](https://img.shields.io/pypi/v/axios_python.svg)](https://pypi.org/project/axios_python/)
-[![Python versions](https://img.shields.io/pypi/pyversions/axios_python.svg)](https://pypi.org/project/axios_python/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+<div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+  [![PyPI version](https://img.shields.io/pypi/v/axios_python.svg)](https://pypi.org/project/axios_python/)
+  [![Python versions](https://img.shields.io/pypi/pyversions/axios_python.svg)](https://pypi.org/project/axios_python/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+</div>
 
-A developer-experience-first HTTP client for Python, heavily inspired by [Axios](https://axios-http.com/).
+A developer-experience-first HTTP client for Python, heavily inspired by [Axios](https://axios-http.com/). Built natively on `httpx`, it adds a **network orchestration layer** that raw transport libraries don't provide — lifecycle hooks, middleware pipelines, interceptors, automatic retries, and a unified sync/async API.
 
-The Python ecosystem has amazing HTTP transport libraries (`requests`, `httpx`, `aiohttp`), but they are often focused purely on sending requests and getting responses. Modern applications need a **network orchestration layer**—features like request lifecycle hooks, middleware, interceptors, isolated client instances, request cancellation, and unified synchronous/asynchronous developer experience. 
+---
 
-`axios_python` brings the elegant, feature-rich Axios model to Python, built natively on top of `httpx`.
+## Why axios_python?
+
+Python's HTTP ecosystem (`requests`, `httpx`, `aiohttp`) excels at transport. But modern applications need more:
+
+| Capability | requests | httpx | **axios_python** |
+|---|---|---|---|
+| Sync requests | ✅ | ✅ | ✅ |
+| Async requests | ❌ | ✅ | ✅ |
+| Request interceptors | ❌ | ❌ | ✅ |
+| Middleware pipeline | ❌ | ❌ | ✅ |
+| Built-in retry engine | ❌ | ❌ | ✅ |
+| Plugin system | ❌ | ❌ | ✅ |
+| Request cancellation | ❌ | ❌ | ✅ |
+| Isolated client instances | ❌ | ✅ | ✅ |
+| Swappable transport | ❌ | ✅ | ✅ |
 
 ---
 
 ## Features
 
-- 🌐 **Instance-based Client:** Completely isolated state for different APIs.
-- 🔄 **Unified API:** Identical interface for both Sync (`api.get()`) and Async (`await api.async_get()`).
-- 🔗 **Interceptors:** Hook into requests before they are sent, or responses before they are returned.
-- 🚰 **Middleware Pipeline:** Express.js-style async middleware for complex request wrapping.
-- 🔁 **Retry Engine:** Built-in strategies for linear, fixed, and exponential backoff.
-- 🚫 **Cancellation Tokens:** Cleanly abort requests gracefully.
-- 🔌 **Plugin System:** Easily extend clients with Cache, Auth, and Logging plugins (included out-of-the-box).
-- 🧩 **Swappable Transport:** Backed by `httpx` by default, but completely abstracted for custom transports.
-- 📝 **Fully Typed:** 100% strict typing support for modern Python 3.10+.
+- 🌐 **Instance-based clients** — Completely isolated state, headers, and config per API.
+- 🔄 **Unified sync/async API** — `api.get()` and `await api.async_get()` share an identical interface.
+- 🔗 **Interceptors** — Hook into requests before they're sent or responses before they're returned.
+- 🚰 **Middleware pipeline** — Express.js-style async middleware for timing, tracing, and custom caching.
+- 🔁 **Retry engine** — Built-in linear, fixed, and exponential backoff strategies.
+- 🚫 **Cancellation tokens** — Cleanly abort in-flight requests at any point.
+- 🔌 **Plugin system** — Drop in Cache, Auth, and Logger plugins with a single line.
+- 🧩 **Swappable transport** — `httpx` by default; bring your own adapter via `BaseTransport`.
+- 📝 **Fully typed** — 100% strict type annotations for Python 3.10+.
 
 ---
 
 ## Installation
 
-Install using `pip`:
-
+<Tabs items={["pip", "uv", "poetry"]}>
+<Tab value="pip">
 ```bash
 pip install axios_python
 ```
+</Tab>
+<Tab value="uv">
+```bash
+uv add axios_python
+```
+</Tab>
+<Tab value="poetry">
+```bash
+poetry add axios_python
+```
+</Tab>
+</Tabs>
 
-Requires Python 3.10+.
-
-import { Cards, Card } from 'fumadocs-ui/components/card';
-import { Steps } from 'fumadocs-ui/components/steps';
-import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
-
-## Table of Contents
-
-<Cards>
-  <Card title="Getting Started" href="/docs/getting-started" description="Install the library and write your first request." />
-  <Card title="Client API" href="/docs/client-api" description="Deep dive into the core properties of the axios_python client instance." />
-  <Card title="Concurrent Requests" href="/docs/concurrent-requests" description="Run multiple API requests simultaneously and orchestrate results." />
-  <Card title="Data Transformation" href="/docs/data-transformation" description="Modify request data and headers prior to transmission or parsing." />
-  <Card title="Interceptors" href="/docs/interceptors" description="Mutate requests before they are sent or map responses." />
-  <Card title="Middleware" href="/docs/middleware" description="Powerful async Express-style request wrappers." />
-  <Card title="Retry Mechanisms" href="/docs/retry" description="Keep your app resilient with automatic backoffs." />
-  <Card title="Request Cancellation" href="/docs/cancellation" description="Cancel long running requests with CancelTokens." />
-  <Card title="Plugins System" href="/docs/plugins" description="Easily drop in caching, logging, and auth." />
-  <Card title="Plugin Authoring" href="/docs/plugin-authoring" description="Build and distribute custom plugins for axios_python." />
-  <Card title="Error Handling" href="/docs/error-handling" description="Learn about the robust exception hierarchy." />
-  <Card title="Streaming" href="/docs/streaming" description="Iterate over large file downloads cleanly." />
-  <Card title="Best Practices" href="/docs/best-practices" description="Production guidance for building with axios_python." />
-  <Card title="Before vs After" href="/docs/before-vs-after" description="Real world comparisons to raw httpx and requests." />
-</Cards>
+<Callout type="info">
+  Requires **Python 3.10 or higher**. `httpx` is installed automatically as a dependency.
+</Callout>
 
 ---
 
 ## Quick Start
 
 <Steps>
-### Install the package
+<Step>
+### Make a one-off request
 
-Install the package via `pip` natively.
+No setup required. Use the module-level helpers for quick scripts or exploration.
 
-```bash
-pip install axios_python
+```python
+import axios_python
+
+response = axios_python.get("https://httpbin.org/get", params={"q": "python"})
+
+print(response.status_code)  # 200
+print(response.ok)           # True
+print(response.json())       # Parsed JSON body
 ```
+</Step>
 
-### Make your first request
+<Step>
+### Create a configured client instance
+
+For real applications, create an isolated `api` instance with shared defaults. Each instance maintains its own headers, interceptors, middleware, and plugin state — completely independent from others.
+
+```python
+import axios_python
+
+api = axios_python.create({
+    "base_url": "https://api.myapp.com/v1",
+    "timeout": 15,
+    "headers": {
+        "X-App-Version": "2.0",
+        "Accept": "application/json",
+    },
+})
+
+response = api.get("/users", params={"page": 1})
+print(response.json())
+```
+</Step>
+
+<Step>
+### Use sync or async — your choice
+
+The API is identical. Prefix any method with `async_` to get a non-blocking coroutine.
 
 <Tabs items={["Synchronous", "Asynchronous"]}>
 <Tab value="Synchronous">
 ```python
 import axios_python
 
-# Option A: Zero-setup module level request
-response = axios_python.get("https://httpbin.org/get", params={"query": "python"})
+api = axios_python.create({"base_url": "https://httpbin.org"})
 
-# Option B: Create an isolated instance with default configuration
-api = axios_python.create({
-    "base_url": "https://httpbin.org",
-    "timeout": 10,
-    "headers": {
-        "X-App-Client": "MyCLI/1.0"
-    }
-})
-
-# Make a request using the instance
 response = api.get("/get", params={"query": "python"})
-
 print(f"Status: {response.status_code}")
-if response.ok:
-    print(response.json())
 ```
 </Tab>
-
 <Tab value="Asynchronous">
-`axios_python` treats async as a first-class citizen. Just use `async_get`, `async_post`, etc.
-
 ```python
 import asyncio
 import axios_python
 
-async def fetch_data():
-    # Non-blocking async call via instance
-    api = axios_python.create({"base_url": "https://httpbin.org"})
+api = axios_python.create({"base_url": "https://httpbin.org"})
+
+async def main():
     response = await api.async_get("/delay/2")
-    
-    # Or module level
-    response = await axios_python.async_get("https://httpbin.org/delay/2")
     print(response.data)
 
-asyncio.run(fetch_data())
+asyncio.run(main())
 ```
 </Tab>
 </Tabs>
+</Step>
 
-### Handle edge cases
-
-Handle streaming and file uploads identically to familiar requests libraries.
+<Step>
+### Handle file uploads and streams
 
 <Tabs items={["File Uploads", "Streaming Responses"]}>
 <Tab value="File Uploads">
-Multipart file uploads are supported out of the box matching the `requests` interface.
-
-```python
-with open("report.csv", "rb") as f:
-    # Files can be passed as an open file handle or a tuple mapping
-    files = {"file": ("report.csv", f, "text/csv")}
-    response = axios_python.post("https://httpbin.org/post", files=files)
-```
-</Tab>
-<Tab value="Streaming Responses">
-For large files or continuous data streams, use `stream=True`. The response is exposed as a context manager for both sync and async calls.
+Multipart file uploads follow the familiar `requests` interface — pass a file handle or a `(filename, handle, mimetype)` tuple.
 
 ```python
 import axios_python
 
-# Synchronous execution
-with axios_python.get("https://httpbin.org/stream-bytes/100", stream=True) as response:
-    for chunk in response.iter_bytes(chunk_size=10):
-        print(len(chunk))
+with open("report.csv", "rb") as f:
+    response = axios_python.post(
+        "https://httpbin.org/post",
+        files={"file": ("report.csv", f, "text/csv")},
+    )
 
-# Asynchronous execution in an async function
-async with await axios_python.async_get("https://.../stream", stream=True) as response:
-    async for line in response.aiter_lines():
-        print(line)
+print(response.status_code)
+```
+</Tab>
+<Tab value="Streaming Responses">
+Pass `stream=True` to avoid buffering large responses into memory. The response becomes a context manager exposing `iter_bytes()` and `aiter_lines()`.
+
+```python
+import axios_python
+
+with axios_python.get("https://httpbin.org/stream-bytes/1024", stream=True) as resp:
+    for chunk in resp.iter_bytes(chunk_size=64):
+        process(chunk)
+async def stream_data():
+    async with await axios_python.async_get("https://.../stream", stream=True) as resp:
+        async for line in resp.aiter_lines():
+            print(line)
 ```
 </Tab>
 </Tabs>
+</Step>
 </Steps>
 
 ---
@@ -167,177 +197,403 @@ async with await axios_python.async_get("https://.../stream", stream=True) as re
 
 ### Interceptors
 
-Interceptors allow you to tap into the lifecycle of a request or response. They run sequentially.
+Interceptors let you tap into the **request/response lifecycle**. They run sequentially in the order they are registered and are ideal for cross-cutting concerns like authentication, logging, and response normalization.
 
 ```python
 api = axios_python.create({"base_url": "https://api.myapp.com"})
 
-# Add a request interceptor
-def authorize_request(config):
-    config["headers"]["Authorization"] = "Bearer token123"
+# --- Request interceptor ---
+def attach_auth(config):
+    config["headers"]["Authorization"] = f"Bearer {get_current_token()}"
     return config
 
-api.interceptors.request.use(authorize_request)
+api.interceptors.request.use(attach_auth)
 
-# Add a response interceptor
-def unwrap_data(response):
-    # Automatically unwrap the 'data' payload from the JSON
+# --- Response interceptor ---
+def unwrap_envelope(response):
     response.data = response.json().get("data", response.data)
     return response
 
-api.interceptors.response.use(unwrap_data)
+api.interceptors.response.use(unwrap_envelope)
+
+# --- Error interceptor ---
+def handle_401(error):
+    if error.response and error.response.status_code == 401:
+        refresh_token()
+    raise error
+
+api.interceptors.response.use(unwrap_envelope, handle_401)
 ```
+
+<Callout type="tip">
+  Interceptors are **synchronous** by design for simplicity. For async-capable wrapping logic (e.g., distributed tracing, async token refresh), use [Middleware](#middleware) instead.
+</Callout>
+
+---
 
 ### Middleware
 
-For more complex logic that needs to "wrap" the entire request (like timing, distributed tracing, or custom caching), use the Express.js-style middleware pipeline.
+Middleware wraps the **entire request pipeline**, giving you control both before and after the underlying transport call. This is the right tool for timing, distributed tracing, circuit breakers, and custom caching.
 
 ```python
 import time
 
-async def logger_middleware(ctx, next_fn):
-    print(f"Starting {ctx.get('method')} to {ctx.get('url')}")
+async def timing_middleware(ctx, next_fn):
     start = time.monotonic()
-    
-    # Yield control to the next middleware / transport layer
+    print(f"→ {ctx['method'].upper()} {ctx['url']}")
+
     result = await next_fn(ctx)
-    
-    elapsed = time.monotonic() - start
-    print(f"Finished in {elapsed:.3f}s with status {result.status_code}")
-    
+
+    elapsed = (time.monotonic() - start) * 1000
+    print(f"← {result.status_code} in {elapsed:.1f}ms")
     return result
 
-api.use(logger_middleware)
+
+async def trace_middleware(ctx, next_fn):
+    ctx["headers"]["X-Trace-Id"] = generate_trace_id()
+    return await next_fn(ctx)
+
+
+api.use(trace_middleware)
+api.use(timing_middleware)
 ```
+
+Middleware is executed in the order it is registered. The call to `await next_fn(ctx)` passes control to the next middleware — or to the transport layer if it is the last in the chain.
+
+---
 
 ### Retry Engine
 
-Temporary network issues shouldn't hard-crash your app. Provide a retry strategy when creating your client.
+Network hiccups shouldn't take down your app. Configure a retry strategy when creating your client, and `axios_python` handles back-off transparently.
+
+<Tabs items={["Exponential Backoff", "Linear Backoff", "Fixed Delay"]}>
+<Tab value="Exponential Backoff">
+```python
+from axios_python import ExponentialBackoff
+
+api = axios_python.create({
+    "base_url": "https://api.myapp.com",
+    "max_retries": 4,
+    "retry_strategy": ExponentialBackoff(
+        base=0.5,
+        multiplier=2.0,
+        max_delay=10.0,
+    ),
+})
+```
+</Tab>
+<Tab value="Linear Backoff">
+```python
+from axios_python import LinearBackoff
+
+api = axios_python.create({
+    "base_url": "https://api.myapp.com",
+    "max_retries": 3,
+    "retry_strategy": LinearBackoff(delay=1.0),  # 1s, 2s, 3s
+})
+```
+</Tab>
+<Tab value="Fixed Delay">
+```python
+from axios_python import FixedBackoff
+
+api = axios_python.create({
+    "base_url": "https://api.myapp.com",
+    "max_retries": 5,
+    "retry_strategy": FixedBackoff(delay=2.0),  # Always 2s
+})
+```
+</Tab>
+</Tabs>
+
+By default, retries trigger on **network errors** and **timeouts**. To also retry on specific HTTP status codes:
 
 ```python
 from axios_python import ExponentialBackoff
 
 api = axios_python.create({
-    "base_url": "https://httpbin.org",
+    "base_url": "https://api.myapp.com",
     "max_retries": 3,
-    "retry_strategy": ExponentialBackoff(base=1.0, multiplier=2.0, max_delay=10.0),
+    "retry_strategy": ExponentialBackoff(
+        base=1.0,
+        multiplier=2.0,
+        retry_on_status=[429, 502, 503, 504],
+    ),
 })
 ```
 
-By default, this retries on Network Errors and Timeouts.
+---
 
 ### Request Cancellation
 
-Use a `CancelToken` to abort long-running requests or cancel requests when a user navigates away.
+Use a `CancelToken` to abort in-flight requests — useful for search-as-you-type, user navigation, or timeout-driven cancellation.
 
 ```python
-from axios_python import CancelToken
 import threading
 import time
+import axios_python
+from axios_python import CancelToken
 
+api = axios_python.create({"base_url": "https://httpbin.org"})
 token = CancelToken()
 
-def background_fetch():
+def fetch():
     try:
-        api.get("/delay/10", cancel_token=token)
+        response = api.get("/delay/10", cancel_token=token)
+        print(response.status_code)
     except axios_python.CancelError as e:
-        print(f"Request aborted: {e}")
+        print(f"Aborted: {e}")
 
-threading.Thread(target=background_fetch).start()
+thread = threading.Thread(target=fetch)
+thread.start()
 
-time.sleep(1)
-token.cancel(reason="User clicked 'Stop'")
+time.sleep(1.5)
+token.cancel(reason="User navigated away")
+thread.join()
 ```
+
+<Callout type="tip">
+  In async code, `CancelToken` integrates seamlessly with `asyncio.Task` cancellation. You can also share a single token across multiple concurrent requests to abort them all at once.
+</Callout>
+
+---
+
+## Concurrent Requests
+
+Execute multiple requests in parallel and collect results together.
+
+<Tabs items={["Synchronous", "Asynchronous"]}>
+<Tab value="Synchronous">
+```python
+from concurrent.futures import ThreadPoolExecutor
+import axios_python
+
+api = axios_python.create({"base_url": "https://httpbin.org"})
+
+endpoints = ["/get", "/ip", "/user-agent", "/headers"]
+
+with ThreadPoolExecutor(max_workers=4) as pool:
+    futures = [pool.submit(api.get, ep) for ep in endpoints]
+    results = [f.result() for f in futures]
+
+for response in results:
+    print(response.status_code, response.url)
+```
+</Tab>
+<Tab value="Asynchronous">
+```python
+import asyncio
+import axios_python
+
+api = axios_python.create({"base_url": "https://httpbin.org"})
+
+async def main():
+    tasks = [
+        api.async_get("/get"),
+        api.async_get("/ip"),
+        api.async_get("/user-agent"),
+    ]
+    results = await asyncio.gather(*tasks)
+    for response in results:
+        print(response.status_code, response.json())
+
+asyncio.run(main())
+```
+</Tab>
+</Tabs>
 
 ---
 
 ## Plugins
 
-`axios_python` ships with first-party plugins for common use-cases.
+Plugins extend client instances with reusable, composable behavior. Register them once; they apply to every request the instance makes.
 
-### Authentication Plugin
+### Auth Plugin
 
-Automatically injects `Authorization` headers. Supports static tokens or dynamic providers.
+Injects `Authorization` headers automatically. Supports static tokens or a **dynamic provider function** for token rotation.
 
 ```python
 from axios_python import AuthPlugin
 
 api.plugin(AuthPlugin(scheme="Bearer", token="super-secret-key"))
 
-# Or dynamically fetch it:
-# api.plugin(AuthPlugin(token_provider=lambda: get_fresh_token()))
+api.plugin(AuthPlugin(
+    scheme="Bearer",
+    token_provider=lambda: vault.get_secret("api-token"),
+))
 ```
+
+---
 
 ### Cache Plugin
 
-In-memory TTL cache for `GET` requests to reduce redundant network load.
+In-memory TTL cache for `GET` requests. Identical URLs return cached responses without a network round-trip.
 
 ```python
 from axios_python import CachePlugin
 
-# Cache GET responses for 120 seconds, max 256 items
-api.plugin(CachePlugin(ttl=120, max_size=256))
+api.plugin(CachePlugin(
+    ttl=120,
+    max_size=256,
+))
 ```
+
+<Callout type="note">
+  The Cache Plugin only caches `GET` requests. `POST`, `PUT`, `PATCH`, and `DELETE` requests always bypass the cache and additionally **invalidate** any cached entry for the same URL.
+</Callout>
+
+---
 
 ### Logger Plugin
 
-Standardized `logging` for requests and responses out of the box.
+Structured `logging`-module output for every request and response, with configurable verbosity.
 
 ```python
 import logging
 from axios_python import LoggerPlugin
 
-logging.basicConfig(level=logging.INFO)
-api.plugin(LoggerPlugin(level=logging.INFO))
+logging.basicConfig(level=logging.DEBUG)
+
+api.plugin(LoggerPlugin(
+    level=logging.INFO,
+    log_headers=False,
+    log_body=True,
+))
+```
+
+---
+
+### Writing Custom Plugins
+
+Implement the `Plugin` protocol — two optional hooks, zero boilerplate.
+
+```python
+from axios_python import Plugin
+
+class CorrelationIdPlugin(Plugin):
+    """Attaches a unique X-Correlation-Id header to every outgoing request."""
+
+    def on_request(self, config: dict) -> dict:
+        import uuid
+        config["headers"]["X-Correlation-Id"] = str(uuid.uuid4())
+        return config
+
+    def on_response(self, response):
+        cid = response.headers.get("X-Correlation-Id")
+        response.correlation_id = cid
+        return response
+
+api.plugin(CorrelationIdPlugin())
+```
+
+---
+
+## Error Handling
+
+`axios_python` uses a typed exception hierarchy rooted at `AxiosPythonError`. Every exception carries the original request config and, where applicable, the response object.
+
+```python
+import axios_python
+
+try:
+    response = axios_python.get("https://httpbin.org/status/503")
+    response.raise_for_status()
+
+except axios_python.HTTPStatusError as e:
+    print(f"HTTP {e.response.status_code}: {e.response.url}")
+
+except axios_python.TimeoutError:
+    print("Request exceeded the configured timeout.")
+
+except axios_python.NetworkError:
+    print("Could not reach the server. Check connectivity.")
+
+except axios_python.RetryError as e:
+    print(f"Exhausted all retry attempts. Last error: {e.__cause__}")
+
+except axios_python.CancelError as e:
+    print(f"Request was cancelled: {e}")
+
+except axios_python.AxiosPythonError as e:
+    print(f"Unexpected error: {e}")
+```
+
+### Exception Hierarchy
+
+```
+AxiosPythonError
+├── HTTPStatusError      # Non-2xx response (raise_for_status)
+├── TimeoutError         # Connect or read timeout exceeded
+├── NetworkError         # DNS failure, connection refused, etc.
+├── RetryError           # All retry attempts exhausted
+└── CancelError          # Request aborted via CancelToken
 ```
 
 ---
 
 ## Configuration Reference
 
-You can pass the following properties to `axios_python.create(config)` or as overrides to individual request methods (`api.get("/url", **kwargs)`):
+All options can be passed to `axios_python.create(config)` as instance-level defaults, or overridden per-request as keyword arguments.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `base_url` | `str` | Base URL attached to relative paths. |
-| `method` | `str` | HTTP Method (e.g., `"GET"`, `"POST"`). |
-| `url` | `str` | The target path or absolute URL. |
-| `headers` | `dict` | Dictionary of HTTP headers. |
-| `params` | `dict` | URL Query parameters. |
-| `data` | `Any` | Request body content (raw). |
-| `json` | `Any` | Request body content (automatically serialized to JSON). |
-| `files` | `Any` | Multipart-encoded files dictionary. |
-| `stream` | `bool` | Stream the response (Default: False). |
-| `timeout` | `float` | Max seconds to wait for a response (Default: 30). |
-| `max_retries` | `int` | Maximum retry attempts on failure (Default: 0). |
-| `retry_strategy` | `RetryStrategy` | Backoff class instance (e.g., `ExponentialBackoff`). |
-| `cancel_token` | `CancelToken` | Token to cancel the request mid-flight. |
-
----
-
-## Error Handling
-
-`axios_python` provides strongly typed exceptions extending from `AxiosPythonError`. The `Response` object provides a `.raise_for_status()` method exactly like `requests`.
-
-```python
-import axios_python
-
-try:
-    response = axios_python.get("https://httpbin.org/status/404")
-    response.raise_for_status()
-except axios_python.HTTPStatusError as e:
-    print(f"Request failed with status code {e.response.status_code}")
-except axios_python.TimeoutError:
-    print("Request timed out.")
-except axios_python.NetworkError:
-    print("Unable to connect to the server.")
-except axios_python.RetryError:
-    print("All retry attempts failed.")
-except axios_python.CancelError:
-    print("Request was manually cancelled.")
-except axios_python.AxiosPythonError as e:
-    print(f"A general axios_python error occurred: {e}")
-```
+<TypeTable
+  type={{
+    base_url: {
+      description: 'Base URL prepended to all relative request paths.',
+      type: 'str',
+      default: 'None',
+    },
+    headers: {
+      description: 'Default HTTP headers merged into every request.',
+      type: 'dict[str, str]',
+      default: '{}',
+    },
+    params: {
+      description: 'Default URL query parameters appended to every request.',
+      type: 'dict[str, Any]',
+      default: '{}',
+    },
+    timeout: {
+      description: 'Maximum seconds to wait for a response before raising TimeoutError.',
+      type: 'float',
+      default: '30',
+    },
+    max_retries: {
+      description: 'Number of retry attempts on eligible failures.',
+      type: 'int',
+      default: '0',
+    },
+    retry_strategy: {
+      description: 'Backoff strategy instance (ExponentialBackoff, LinearBackoff, FixedBackoff).',
+      type: 'RetryStrategy',
+      default: 'None',
+    },
+    stream: {
+      description: 'When True, the response body is not immediately buffered into memory.',
+      type: 'bool',
+      default: 'False',
+    },
+    cancel_token: {
+      description: 'CancelToken instance used to abort this request mid-flight.',
+      type: 'CancelToken',
+      default: 'None',
+    },
+    data: {
+      description: 'Raw request body content.',
+      type: 'Any',
+      default: 'None',
+    },
+    json: {
+      description: 'Request body serialized as JSON. Sets Content-Type automatically.',
+      type: 'Any',
+      default: 'None',
+    },
+    files: {
+      description: 'Multipart-encoded file dictionary. Keys are field names.',
+      type: 'dict[str, Any]',
+      default: 'None',
+    },
+  }}
+/>
 
 ---
 
@@ -345,24 +601,58 @@ except axios_python.AxiosPythonError as e:
 
 ### Custom Transports
 
-You aren't locked into `httpx`. You can build a custom transport adapter by implementing the `BaseTransport` abstract class.
+Replace `httpx` entirely by implementing `BaseTransport`. This is useful for testing (mock transports), internal RPC protocols, or alternate HTTP backends.
 
 ```python
-from axios_python import AxiosPython, BaseTransport
+from axios_python import AxiosPython, BaseTransport, Response
 
 class MockTransport(BaseTransport):
-    def send(self, request):
-        return axios_python.Response(200, {}, {"mock": "data"}, request)
+    """Returns a canned 200 response for every request — great for unit tests."""
 
-    async def send_async(self, request):
+    def send(self, request) -> Response:
+        return Response(
+            status_code=200,
+            headers={"Content-Type": "application/json"},
+            data={"mock": True, "url": str(request.url)},
+            request=request,
+        )
+
+    async def send_async(self, request) -> Response:
         return self.send(request)
 
-# Pass the custom transport directly to the AxiosPython constructor
-api = AxiosPython(config={"base_url": "mock://"}, transport=MockTransport())
+
+api = AxiosPython(
+    config={"base_url": "https://api.myapp.com"},
+    transport=MockTransport(),
+)
+
+response = api.get("/users")
+print(response.json())  # {"mock": True, "url": "https://api.myapp.com/users"}
 ```
+
+---
+
+## Explore the Docs
+
+<Cards>
+  <Card title="Getting Started" href="/docs/getting-started" description="Install the library and write your first request in under 5 minutes." />
+  <Card title="Client API" href="/docs/client-api" description="Deep dive into every property and method on the axios_python instance." />
+  <Card title="Concurrent Requests" href="/docs/concurrent-requests" description="Run multiple API calls simultaneously and merge results." />
+  <Card title="Data Transformation" href="/docs/data-transformation" description="Transform request payloads and response bodies before they're used." />
+  <Card title="Interceptors" href="/docs/interceptors" description="Tap into the request and response lifecycle with sequential hooks." />
+  <Card title="Middleware" href="/docs/middleware" description="Wrap requests end-to-end with async Express.js-style middleware." />
+  <Card title="Retry Mechanisms" href="/docs/retry" description="Keep your app resilient with automatic backoff strategies." />
+  <Card title="Request Cancellation" href="/docs/cancellation" description="Abort long-running or stale requests with CancelTokens." />
+  <Card title="Plugin System" href="/docs/plugins" description="Drop in caching, auth injection, and logging with a single line." />
+  <Card title="Plugin Authoring" href="/docs/plugin-authoring" description="Build, test, and distribute your own axios_python plugins." />
+  <Card title="Error Handling" href="/docs/error-handling" description="Master the typed exception hierarchy and build resilient error flows." />
+  <Card title="Streaming" href="/docs/streaming" description="Process large downloads and real-time streams without buffering." />
+  <Card title="Best Practices" href="/docs/best-practices" description="Production patterns for building reliable services with axios_python." />
+  <Card title="Before vs After" href="/docs/before-vs-after" description="Side-by-side comparisons against raw httpx and requests." />
+</Cards>
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE). Contributions welcome.

@@ -21,7 +21,6 @@ Often, you find yourself repeating the same headers or base URLs across multiple
 import httpx
 from config import GITHUB_TOKEN
 
-# Every file that needs to hit Github needs to rebuild this
 def fetch_user(username: str):
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
@@ -45,7 +44,6 @@ def star_repo(owner: str, repo: str):
 import axios_python
 from config import GITHUB_TOKEN
 
-# Define configuration exactly once
 github_api = axios_python.create({
     "base_url": "https://api.github.com",
     "headers": {
@@ -89,7 +87,6 @@ def fetch_flaky_endpoint():
             if attempt == max_retries:
                 raise e
             
-            # Simple exponential backoff
             delay = base_delay * (2 ** attempt)
             print(f"Failed. Retrying in {delay}s...")
             time.sleep(delay)
@@ -107,7 +104,6 @@ api = axios_python.create({
     "retry_strategy": ExponentialBackoff(base=1.0, multiplier=2.0)
 })
 
-# The engine handles all sleeping, logging, and error catching automatically
 def fetch_flaky_endpoint():
     return api.get("/data").json()
 ```
@@ -126,7 +122,6 @@ import httpx
 def get_users():
     response = httpx.get("https://api.example.com/users")
     payload = response.json()
-    # Have to remember to unpack 'data' everywhere
     if "data" in payload:
         return payload["data"]
     return payload
@@ -144,12 +139,9 @@ def unwrap_data(response):
         response.data = payload["data"]
     return response
 
-# Attach the interceptor once
 api.interceptors.response.use(unwrap_data)
 
-# Everywhere else:
 def get_users():
-    # `response.data` is automatically unwrapped
     return api.get("/users").data 
 ```
   </Tab>
@@ -188,7 +180,6 @@ class SDK:
         return self.api.get("/data").json()
 
     async def async_get_data(self):
-        # Uses the exact same underlying logic, interceptors, and config
         response = await self.api.async_get("/data")
         return response.json()
 ```

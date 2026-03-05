@@ -20,17 +20,13 @@ To stream a request, pass exactly `stream=True` in the method signature or confi
 ```python
 import axios_python
 
-chunk_size = 1024 # 1KB
+chunk_size = 1024
 
-# Wrap the request in a context manager
 with axios_python.get("https://httpbin.org/stream-bytes/50000", stream=True) as response:
-    # Check the headers or status
     print(f"Status OK? {response.ok}")
     
-    # Lazily iterate the payload
     for chunk in response.iter_bytes(chunk_size):
         print(f"Received chunk! Next 1024 bytes: {len(chunk)}")
-        # Example: file.write(chunk)
 ```
 
 ## Streaming Asynchronously
@@ -42,12 +38,9 @@ import asyncio
 import axios_python
 
 async def download_worker():
-    # Wrap in `async with await`
     async with await axios_python.async_get("https://httpbin.org/stream-bytes/50000", stream=True) as response:
         
-        # Pull bytes from the socket asynchronously
         async for chunk in response.aiter_bytes():
-            # Example: await asyncio_file.write(chunk)
             print("Received bytes payload asynchronously!")
 
 asyncio.run(download_worker())
@@ -73,7 +66,6 @@ If you decide halfway through that you just want the rest of the stream loaded i
 
 ```python
 with axios_python.get(..., stream=True) as response:
-    # Force loads the remaining payload dynamically!
     payload = response.read()
     print(payload)
 ```

@@ -23,7 +23,6 @@ def add_auth_timestamp(config):
     config["headers"]["X-Timestamp"] = str(int(time.time()))
     return config
 
-# Register the interceptor
 api.interceptors.request.use(add_auth_timestamp)
 ```
 
@@ -33,7 +32,6 @@ Response interceptors receive the `Response` object. They are often used to glob
 
 ```python
 def map_response_data(response):
-    # Automatically unwrap nested 'payload' dictionary if it exists
     data = response.json()
     if isinstance(data, dict) and "payload" in data:
         response.data = data["payload"]
@@ -73,7 +71,7 @@ Interceptors can be fully asynchronous natively. `axios-python` detects if your 
 import asyncio
 
 async def fetch_token_async(config):
-    await asyncio.sleep(0.1) # Simulate DB lookup
+    await asyncio.sleep(0.1)
     config["headers"]["Authorization"] = "Bearer token123"
     return config
 

@@ -1,88 +1,163 @@
 ---
 title: "Plugins"
-description: "Extending axios-python with Cache, Auth, and Logging"
+description: "Extending axios_python with built-in and custom plugins for auth, caching, and logging."
 ---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Cards, Card } from 'fumadocs-ui/components/card';
 
 # Plugins
 
-`axios-python` ships with several first-party plugins for common use-cases that would normally require you to write repetitive interceptors across all your projects.
+Plugins extend a client instance with reusable, composable behavior. Rather than wiring the same interceptors into every project, you register a plugin once and it applies to every request the instance makes.
 
-Plugins must implement the `Plugin` protocol, requiring an `install(client)` method.
+All plugins implement the `Plugin` protocol — a single `install(client)` method — and are registered via `.plugin()`.
 
-You can register plugins on an instance via the `.plugin()` method.
+```python
+api.plugin(SomePlugin(...))
+```
+
+That's the entire surface area. Everything else is convention.
+
+---
 
 ## Built-in Plugins
 
+<Cards>
+  <Card title="AuthPlugin" href="#authentication-plugin-authplugin" description="Injects Authorization headers from a static token or dynamic provider." />
+  <Card title="CachePlugin" href="#cache-plugin-cacheplugin" description="In-memory TTL cache for GET requests to cut redundant network calls." />
+  <Card title="LoggerPlugin" href="#logger-plugin-loggerplugin" description="Structured request and response logging via Python's logging module." />
+</Cards>
+
+---
+
 ### Authentication Plugin (`AuthPlugin`)
 
-Automatically injects `Authorization` headers into every outgoing request from that instance. It supports both static tokens and dynamic callback providers (useful if tokens expire and need to be refreshed during runtime).
+Injects an `Authorization` header into every outgoing request on the instance. Supports static tokens for simple cases and a `token_provider` callback for tokens that expire and need to be refreshed at runtime.
 
+<Tabs items={["Static Token", "Dynamic Provider"]}>
+<Tab value="Static Token">
 ```python
 from axios_python import AuthPlugin
 import axios_python
 
 api = axios_python.create({"base_url": "https://api.github.com"})
 
-# Static Token Injection (injects `Bearer super-secret-key`)
+# Injects `Authorization: Bearer super-secret-key` on every request
 api.plugin(AuthPlugin(scheme="Bearer", token="super-secret-key"))
+```
+</Tab>
+<Tab value="Dynamic Provider">
+```python
+from axios_python import AuthPlugin
+import axios_python
 
-# Dynamic Token Injection
-def get_fresh_token():
-    # Read from environment, file, or a refresh endpoint
-    return retrieve_token()
+api = axios_python.create({"base_url": "https://api.github.com"})
+
+# Called before each request — ideal for short-lived tokens
+def get_fresh_token() -> str:
+    return token_store.retrieve()  # env var, secret manager, refresh endpoint
 
 api.plugin(AuthPlugin(scheme="Bearer", token_provider=get_fresh_token))
 ```
+</Tab>
+</Tabs>
+
+<Callout type="info" title="Supported schemes">
+  `AuthPlugin` accepts any scheme string — `"Bearer"`, `"Token"`, `"Basic"`, or any custom scheme your API expects. The value is injected verbatim as `{scheme} {token}`.
+</Callout>
+
+---
 
 ### Cache Plugin (`CachePlugin`)
 
-Provides an in-memory TTL (Time-To-Live) cache for `GET` requests to reduce redundant network load. Repeated requests to the exact same URL + Query Params within the TTL window will short-circuit the network entirely.
+Caches `GET` responses in memory for a configurable TTL. Subsequent requests to the same URL and query parameters within that window skip the network entirely and return the cached response.
 
 ```python
 from axios_python import CachePlugin
 
-# Cache GET responses for 120 seconds, storing up to 256 unique queries
+# Cache GET responses for 120 seconds, evicting least-recently-used entries after 256
 api.plugin(CachePlugin(ttl=120, max_size=256))
 
-api.get("/heavy-query") # hits the network
-api.get("/heavy-query") # instantly returns cached Response
+api.get("/reports/summary")  # Network request — response cached
+api.get("/reports/summary")  # Served from cache instantly
 ```
+
+<Callout type="note" title="Cache scope and invalidation">
+  The cache is scoped to the client instance — two separate instances do not share a cache. Only `GET` requests are cached. `POST`, `PUT`, `PATCH`, and `DELETE` requests always bypass the cache and additionally **invalidate** any cached entry for the same URL.
+</Callout>
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `ttl` | `int` | `60` | Seconds before a cached entry expires. |
+| `max_size` | `int` | `128` | Maximum number of cached entries. Evicts LRU when full. |
+
+---
 
 ### Logger Plugin (`LoggerPlugin`)
 
-Provides standardized `logging` for requests and responses out of the box, mapping perfectly into Python's built-in `logging` module.
+Emits structured log lines for every request and response via Python's built-in `logging` module. Output integrates with any handler already configured in your application — file handlers, `structlog`, cloud log forwarders, all of it.
 
 ```python
 import logging
 from axios_python import LoggerPlugin
 
 logging.basicConfig(level=logging.INFO)
-
-# Will log:
-# INFO:axios_python.logger:--> GET https://httpbin.org/get
-# INFO:axios_python.logger:<-- 200 OK https://httpbin.org/get (data: X bytes)
 api.plugin(LoggerPlugin(level=logging.INFO))
+
+api.get("https://httpbin.org/get")
+# INFO:axios_python.logger:--> GET https://httpbin.org/get
+# INFO:axios_python.logger:<-- 200 OK https://httpbin.org/get (1,204 bytes, 83ms)
 ```
 
-## Creating Custom Plugins
+<Callout type="tip" title="Avoid logging sensitive headers in production">
+  By default, `LoggerPlugin` does not log request or response headers. If you enable header logging for debugging, make sure to disable it — or redact `Authorization` — before deploying to production.
+</Callout>
 
-To create your own plugin, simply implement an object with an `install(client: AxiosPython)` method. Inside that method, you can register interceptors or middleware against the attached `client`.
+---
+
+## Composing Plugins
+
+Plugins stack. Register as many as you need in any order — each one calls `install()` against the same client instance and adds its own interceptors or middleware to the pipeline.
+
+```python
+from axios_python import AuthPlugin, CachePlugin, LoggerPlugin
+
+api = axios_python.create({"base_url": "https://api.myapp.com"})
+
+api.plugin(LoggerPlugin(level=logging.DEBUG))
+api.plugin(AuthPlugin(scheme="Bearer", token_provider=vault.get_token))
+api.plugin(CachePlugin(ttl=60, max_size=512))
+
+# Every request now: logs the outgoing call, injects auth,
+# checks the cache, logs the response.
+```
+
+---
+
+## Writing a Custom Plugin
+
+To write your own plugin, implement an object with a single `install(client: AxiosPython)` method. Inside it, register interceptors or middleware against the provided client — the same APIs available anywhere else.
 
 ```python
 from axios_python import AxiosPython
 
-class HeaderInjectorPlugin:
-    def __init__(self, headers: dict[str, str]):
-        self.headers = headers
+class CorrelationIdPlugin:
+    """Attaches a unique X-Correlation-Id to every outgoing request."""
 
     def install(self, client: AxiosPython) -> None:
-        # Register a request interceptor onto the client
-        def inject_headers(config):
-            for k, v in self.headers.items():
-                config["headers"][k] = v
-            return config
-            
-        client.interceptors.request.use(inject_headers)
+        import uuid
 
-api.plugin(HeaderInjectorPlugin({"X-Custom-Client": "v1"}))
+        def attach_correlation_id(config: dict) -> dict:
+            config["headers"]["X-Correlation-Id"] = str(uuid.uuid4())
+            return config
+
+        client.interceptors.request.use(attach_correlation_id)
+
+
+api.plugin(CorrelationIdPlugin())
 ```
+
+The `install` method receives the fully configured client, so you can introspect its existing config before deciding what to register. If your plugin needs teardown logic (closing a connection pool, flushing a buffer), implement an optional `uninstall(client)` method — `axios_python` will call it when the client is closed.
+
+For a complete walkthrough of building and distributing plugins, see the [Plugin Authoring guide](/docs/plugin-authoring).

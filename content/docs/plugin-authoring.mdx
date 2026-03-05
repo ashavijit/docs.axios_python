@@ -3,97 +3,267 @@ title: "Plugin Authoring"
 description: "How to build and distribute custom plugins for axios_python."
 ---
 
-# Plugin Authoring Guide
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
 
-One of the core design goals of `axios_python` is extensibility. We want the community to build integrations for caching, distributed tracing, metric collections, and authentication so developers don't have to rewrite them.
+# Plugin Authoring
 
-## What is a Plugin?
+`axios_python` is designed to be extended. The plugin system exists so the community can build and share integrations for distributed tracing, metrics, custom caching backends, and authentication schemes — without every developer reinventing the same interceptor patterns.
 
-In `axios_python`, a Plugin is simply a class that implements the `BasePlugin` protocol. When a user registers a plugin via `api.plugin()`, the plugin is assigned an instance of the newly created `AxiosPython` client.
+This guide walks through building a plugin from scratch, covers the two main implementation patterns, and explains how to distribute it.
 
-## Building Your First Plugin
+---
 
-Let's build a plugin that calculates the duration of every request and logs it. We'll call it `TimingPlugin`.
+## The Plugin Contract
+
+A plugin is a class with a single required method: `attach(client)`. When a user calls `api.plugin(YourPlugin())`, `axios_python` immediately calls `attach` with the client instance. From there, your plugin can register any combination of interceptors and middleware.
 
 ```python
-from axios_python.plugins import BasePlugin
 from axios_python import AxiosPython
+
+class MyPlugin:
+    def attach(self, client: AxiosPython) -> None:
+        # Register interceptors, middleware, or both
+        ...
+```
+
+That's the entire contract. No base class is required — `axios_python` uses structural typing, so any object with an `attach` method qualifies.
+
+<Callout type="info" title="Optional teardown">
+  If your plugin holds resources that need cleanup (an open connection, a background flush thread, a metrics buffer), implement an `uninstall(client: AxiosPython) -> None` method. `axios_python` calls it automatically when the client is closed or the plugin is removed.
+</Callout>
+
+---
+
+## Choosing the Right Hook
+
+There are two ways to act on requests inside a plugin, and choosing the right one keeps your implementation simple.
+
+**Use an interceptor** when you need to read or mutate the request config before it's sent, or normalize the response before it's returned. Interceptors are synchronous, lightweight, and run sequentially.
+
+**Use middleware** when you need to wrap the entire transport call — for example, to measure wall-clock latency, implement a circuit breaker, or handle retries with full context. Middleware is async and receives a `next_fn` to call when it wants to hand off to the next layer.
+
+---
+
+## Example: TimingPlugin
+
+A plugin that measures request duration and logs it is a good first example because it requires middleware — you need to capture time both before and after the transport call.
+
+```python
 import time
 import logging
+from axios_python import AxiosPython
 
-class TimingPlugin(BasePlugin):
-    """
-    A plugin that intercepts every request and times its duration.
-    """
-    
-    def __init__(self, logger_name: str = "timing_plugin"):
-        # You can accept custom configuration in your plugin's `__init__`
+class TimingPlugin:
+    """Logs the wall-clock duration of every request made by the client."""
+
+    def __init__(self, logger_name: str = "axios_python.timing"):
         self.logger = logging.getLogger(logger_name)
 
-    def attach(self, client: AxiosPython):
-        # 1. This function is called immediately when `.plugin(TimingPlugin())` is invoked 
-        # 2. You have full access to `client` to inject Interceptors or Middleware!
-        
-        # In this case, we need to wrap the *entire* request execution to capture the network time,
-        # so an async middleware is the perfect tool.
+    def attach(self, client: AxiosPython) -> None:
         client.use(self._timing_middleware)
-        
-    async def _timing_middleware(self, ctx, next_fn):
-        start_time = time.monotonic()
-        
-        # Let the rest of the pipeline run
+
+    async def _timing_middleware(self, ctx: dict, next_fn) -> object:
+        start = time.monotonic()
+
         response = await next_fn(ctx)
-        
-        # Calculate duration
-        duration_ms = (time.monotonic() - start_time) * 1000
-        
-        method = ctx["method"]
-        url = ctx["url"]
-        
-        self.logger.info(f"[{method}] {url} finished in {duration_ms:.2f}ms")
+
+        elapsed_ms = (time.monotonic() - start) * 1000
+        self.logger.info(
+            "[%s] %s — %.1fms (HTTP %s)",
+            ctx["method"].upper(),
+            ctx["url"],
+            elapsed_ms,
+            response.status_code,
+        )
         return response
 ```
 
-### Usage
-
-Your users can now install and use your plugin instantly.
+### Using it
 
 ```python
+import logging
 import axios_python
 from my_package import TimingPlugin
 
-api = axios_python.create({"base_url": "https://api.github.com"})
+logging.basicConfig(level=logging.INFO)
 
-# The plugin injects the middleware pipeline immediately
+api = axios_python.create({"base_url": "https://api.github.com"})
 api.plugin(TimingPlugin())
 
-# This request will be automatically timed and logged!
 api.get("/users/octocat")
+# INFO:axios_python.timing:[GET] https://api.github.com/users/octocat — 91.4ms (HTTP 200)
 ```
 
-## Adding Interceptors via Plugins
+---
 
-Some plugins only need to modify outgoing headers rather than wrapping the whole request. Here's a plugin that adds a static `X-Request-Source` header.
+## Example: RequestSourcePlugin
+
+When you only need to add or modify headers, an interceptor is the right tool — no need for the full middleware wrapper.
 
 ```python
-from axios_python.plugins import BasePlugin
 from axios_python import AxiosPython
 
-class RequestSourcePlugin(BasePlugin):
-    def __init__(self, source_name: str):
-        self.source_name = source_name
+class RequestSourcePlugin:
+    """Stamps every request with a static X-Request-Source header."""
 
-    def attach(self, client: AxiosPython):
-        # We don't need middleware for this, just a request interceptor
-        client.interceptors.request.use(self._inject_header)
+    def __init__(self, source: str):
+        self.source = source
 
-    def _inject_header(self, config):
-        config["headers"]["X-Request-Source"] = self.source_name
+    def attach(self, client: AxiosPython) -> None:
+        client.interceptors.request.use(self._inject_source)
+
+    def _inject_source(self, config: dict) -> dict:
+        config["headers"]["X-Request-Source"] = self.source
         return config
 ```
 
-## Community Plugins
+```python
+api.plugin(RequestSourcePlugin(source="checkout-service/2.1"))
 
-We encourage you to distribute your plugins on PyPI! We suggest using the naming convention `axios-python-plugin-<name>`.
+# Every request from this client now carries:
+# X-Request-Source: checkout-service/2.1
+```
 
-If you have built an exciting plugin, please submit an issue to our Github repository so we can feature it in the documentation.
+---
+
+## Building a Real-World Plugin
+
+A more complete plugin typically needs configuration, lifecycle management, and multiple hooks working together. Here is an example that implements request deduplication — collapsing concurrent identical `GET` requests into a single network call.
+
+```python
+import asyncio
+from axios_python import AxiosPython
+
+class DedupePlugin:
+    """
+    Collapses concurrent identical GET requests into a single in-flight call.
+    Any request that arrives while the first is still running receives the same
+    response without making a second network round-trip.
+    """
+
+    def __init__(self):
+        self._in_flight: dict[str, asyncio.Future] = {}
+
+    def attach(self, client: AxiosPython) -> None:
+        client.use(self._dedupe_middleware)
+
+    def uninstall(self, client: AxiosPython) -> None:
+        self._in_flight.clear()
+
+    async def _dedupe_middleware(self, ctx: dict, next_fn) -> object:
+        if ctx.get("method", "").upper() != "GET":
+            return await next_fn(ctx)
+
+        key = ctx["url"]
+
+        if key in self._in_flight:
+            # A request for this URL is already in flight — wait for it
+            return await self._in_flight[key]
+
+        loop = asyncio.get_event_loop()
+        future: asyncio.Future = loop.create_future()
+        self._in_flight[key] = future
+
+        try:
+            response = await next_fn(ctx)
+            future.set_result(response)
+            return response
+        except Exception as exc:
+            future.set_exception(exc)
+            raise
+        finally:
+            self._in_flight.pop(key, None)
+```
+
+---
+
+## Plugin Composition
+
+Plugins compose cleanly because each one adds its own interceptors and middleware to the shared pipeline in registration order. You can safely stack your plugin with `AuthPlugin`, `CachePlugin`, or `LoggerPlugin` — they don't interfere with each other.
+
+```python
+api.plugin(LoggerPlugin(level=logging.INFO))
+api.plugin(AuthPlugin(scheme="Bearer", token_provider=vault.get_token))
+api.plugin(TimingPlugin())
+api.plugin(DedupePlugin())
+```
+
+<Callout type="tip" title="Registration order matters for middleware">
+  Middleware runs in registration order, outermost first. In the example above, `TimingPlugin` measures the full request time inclusive of deduplication wait time. If you want it to measure only network time, register `TimingPlugin` after `DedupePlugin`.
+</Callout>
+
+---
+
+## Publishing to PyPI
+
+<Steps>
+<Step>
+### Name your package
+
+Use the `axios-python-plugin-` prefix so your package is discoverable:
+
+```
+axios-python-plugin-timing
+axios-python-plugin-opentelemetry
+axios-python-plugin-redis-cache
+```
+</Step>
+
+<Step>
+### Structure your package
+
+Keep the plugin class at the top-level import so users can write `from axios_python_plugin_timing import TimingPlugin` without digging through submodules.
+
+```
+axios-python-plugin-timing/
+    axios_python_plugin_timing/
+        __init__.py          # exports TimingPlugin directly
+        _plugin.py           # implementation
+    pyproject.toml
+    README.md
+```
+</Step>
+
+<Step>
+### Declare your dependency
+
+Pin to a compatible minor version of `axios_python` rather than an exact version, so your plugin works across patch releases.
+
+```toml
+[project]
+dependencies = [
+    "axios_python>=1.0,<2.0",
+]
+```
+</Step>
+
+<Step>
+### Submit for listing
+
+Open an issue on the [axios_python GitHub repository](https://github.com/ashavijit/pyxios) with the subject `[Plugin] <name>` and a short description. Community plugins that pass a basic review are listed in the official documentation.
+</Step>
+</Steps>
+
+---
+
+## Reference
+
+### Plugin protocol
+
+| Method | Required | Called when |
+|--------|----------|-------------|
+| `attach(client: AxiosPython) -> None` | Yes | `api.plugin(...)` is called |
+| `uninstall(client: AxiosPython) -> None` | No | `client.close()` or explicit removal |
+
+### Hook selection guide
+
+| Goal | Use |
+|------|-----|
+| Add or modify request headers | `interceptors.request.use()` |
+| Normalize or transform a response | `interceptors.response.use()` |
+| Handle or reclassify errors | `interceptors.response.use(on_fulfilled, on_rejected)` |
+| Measure end-to-end latency | Middleware |
+| Implement circuit breaking or deduplication | Middleware |
+| Wrap the entire request for tracing | Middleware |

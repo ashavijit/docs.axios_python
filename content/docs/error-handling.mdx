@@ -37,14 +37,11 @@ from axios_python import (
 try:
     response = axios_python.get("https://api.myapp.com/flaky-endpoint")
     
-    # 🌟 Manually check 4xx / 5xx error codes
     response.raise_for_status()
     
-    # If we got here, it's a 2xx success!
     data = response.json()
     
 except HTTPStatusError as e:
-    # Safely extract the original HTTP response from the error
     print(f"Bad status code: {e.response.status_code}")
     print(f"Server replied: {e.response.text}")
     
@@ -55,15 +52,12 @@ except NetworkError:
     print("Unable to connect to the server entirely.")
     
 except RetryError as e:
-    # If the retry failed, the last underlying exception is preserved 
-    # under the `e.last_exception` property
     print("All retry attempts failed. The final error was:", type(e.last_exception))
     
 except CancelError:
     print("Request was manually cancelled by a background thread.")
     
 except AxiosPythonError as e:
-    # Catch-all for things like interceptor errors or logic failures
     print(f"A general axios-python architecture error occurred: {e}")
 ```
 
@@ -76,8 +70,4 @@ response = axios_python.get("https://httpbin.org/status/404")
 
 if not response.ok:
     print("Request failed!")
-
-# This is simply a wrapper around:
-if not (200 <= response.status_code < 300):
-   pass
 ```

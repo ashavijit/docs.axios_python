@@ -1,92 +1,295 @@
 ---
 title: "Retry Engine"
-description: "Configuring automatic retries for flaky networks"
+description: "Configuring automatic retries and backoff strategies for flaky networks."
 ---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { TypeTable } from 'fumadocs-ui/components/type-table';
 
 # Retry Engine
 
-Temporary network issues shouldn't hard-crash your application. `axios-python` includes a highly configurable retry engine built directly into the core lifecycle. 
+Networks fail. Services restart. Rate limits kick in. The retry engine in `axios_python` handles transient failures automatically so your application code doesn't have to.
 
-Retries are evaluated on every request *after* it leaves the request interceptors and *before* it returns to the response interceptors.
+This page covers how the engine works, how to configure it, and how to extend it.
 
-## Basic Usage
+---
 
-You can attach a retry strategy out of the box to any client instance or individual request.
+## How It Works
+
+The retry engine sits between the request interceptors and the response interceptors. When a request fails, the engine intercepts the exception, evaluates whether it's retryable, waits for the configured delay, then re-issues the original request — including all interceptors and middleware — from the beginning.
+
+```
+api.get("/endpoint")
+       │
+       ▼
+┌─────────────────────┐
+│  Request            │  Headers, auth, trace IDs
+│  Interceptors       │  injected here
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  Middleware         │  Timing, logging, circuit
+│  Pipeline           │  breakers run here
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  Transport          │  httpx makes the actual
+│  (httpx)            │  network call
+└────────┬────────────┘
+         │
+    ┌────┴─────┐
+    │          │
+ success    failure
+    │          │
+    │          ▼
+    │   ┌─────────────────────────────┐
+    │   │  Should retry?              │
+    │   │                             │
+    │   │  retry_on(exc) → True?  ───────► wait delay ──► retry from top
+    │   │  attempts < max_retries?    │
+    │   │                             │
+    │   │  No → raise exception   ────────────────────────────┐
+    │   └─────────────────────────────┘                       │
+    │                                                          │
+    ▼                                                          ▼
+┌─────────────────────┐                             exception propagates
+│  Response           │                             to your call site
+│  Interceptors       │
+└────────┬────────────┘
+         │
+         ▼
+    response returned
+    to your call site
+```
+
+A few important behaviors that follow from this design:
+
+**Interceptors re-run on every attempt.** Because the retry loops back to the top of the pipeline, your request interceptors fire again each time. This means a dynamic token provider in `AuthPlugin` will fetch a fresh token on each retry attempt — which is usually exactly what you want after a 401.
+
+**Middleware wraps the entire retry loop.** A timing middleware registered with `client.use()` measures wall-clock time inclusive of all retry attempts and wait periods. If you want per-attempt timing, register it inside a custom `RetryStrategy`.
+
+**The engine only catches transport-layer failures by default.** A successful HTTP response with a `500` status code does not raise an exception from `httpx` — it requires `response.raise_for_status()` to throw. By default, the retry engine never sees it. See [Controlling What Gets Retried](#controlling-what-gets-retried) for how to change this.
+
+---
+
+## Basic Configuration
+
+Attach a retry strategy when creating a client instance. The strategy is shared across every request the instance makes.
 
 ```python
 from axios_python import ExponentialBackoff
 import axios_python
 
 api = axios_python.create({
-    "base_url": "https://httpbin.org",
+    "base_url": "https://api.example.com",
     "max_retries": 3,
     "retry_strategy": ExponentialBackoff(base=1.0, multiplier=2.0, max_delay=10.0),
 })
 ```
 
-If a request fails, it will now wait `1s`, then `2s`, then `4s`, giving up after 3 failed attempts (or if a timeout occurs).
+With this config, a failing request will be retried up to 3 times with delays of `1s → 2s → 4s`, then raise `RetryError` if all attempts are exhausted.
 
-## Supported Strategies
+You can also override retry settings on individual requests without changing the instance defaults:
 
-The following strategies are exposed directly in `axios_python`:
+```python
+# This specific request retries 5 times regardless of the instance default
+response = api.get("/flaky-endpoint", max_retries=5)
+```
 
-### `FixedDelay`
-Waits the exact same amount of time between every retry.
+---
+
+## Backoff Strategies
+
+The three built-in strategies cover the most common production patterns.
+
+### FixedDelay
+
+Waits an identical amount of time between every attempt. Use this when you're dealing with a known rate limit (`Retry-After: 5`) or a service that needs a fixed cooldown period before retrying.
+
 ```python
 from axios_python import FixedDelay
-strategy = FixedDelay(delay=2.0) # wait 2s every time
+
+# Retries at t+2s, t+4s, t+6s
+strategy = FixedDelay(delay=2.0)
 ```
 
-### `LinearBackoff`
-Increases wait time linearly. (base + attempt * increment)
+| attempt | wait |
+|---------|------|
+| 1 | 2.0s |
+| 2 | 2.0s |
+| 3 | 2.0s |
+
+---
+
+### LinearBackoff
+
+Increases wait time by a fixed increment on each attempt, calculated as `base + (attempt × increment)`. Use this for moderate backoff without the steep growth of exponential strategies — well-suited for internal services where you expect recovery within seconds.
+
 ```python
 from axios_python import LinearBackoff
-# Waits 1s, 2s, 3s... up to 5s max
-strategy = LinearBackoff(base=1.0, increment=1.0, max_delay=5.0) 
+
+# Retries at t+1s, t+2s, t+3s, capped at 5s
+strategy = LinearBackoff(base=1.0, increment=1.0, max_delay=5.0)
 ```
 
-### `ExponentialBackoff`
-Increases wait time exponentially. (base * (multiplier ^ attempt))
+| attempt | formula | wait |
+|---------|---------|------|
+| 1 | 1.0 + (1 × 1.0) | 2.0s |
+| 2 | 1.0 + (2 × 1.0) | 3.0s |
+| 3 | 1.0 + (3 × 1.0) | 4.0s |
+
+---
+
+### ExponentialBackoff
+
+Multiplies the wait time on each attempt, calculated as `base × (multiplier ^ attempt)`. This is the industry standard for third-party APIs and public services — the rapid growth discourages hammering an already-struggling service. The `max_delay` cap prevents the wait from becoming impractically long.
+
 ```python
 from axios_python import ExponentialBackoff
-# Waits 1s, 2s, 4s, 8s... up to 30s max
+
+# Retries at t+1s, t+2s, t+4s, capped at 30s
 strategy = ExponentialBackoff(base=1.0, multiplier=2.0, max_delay=30.0)
 ```
 
-## Advanced: Custom Strategies
+| attempt | formula | wait |
+|---------|---------|------|
+| 1 | 1.0 × 2¹ | 2.0s |
+| 2 | 1.0 × 2² | 4.0s |
+| 3 | 1.0 × 2³ | 8.0s |
+| 4 | 1.0 × 2⁴ | 16.0s |
+| 5 | 1.0 × 2⁵ | 30.0s *(capped)* |
 
-You can write your own strategy by subclassing `RetryStrategy`.
+<Callout type="tip" title="Add jitter in high-concurrency environments">
+  If many clients start simultaneously and all fail at once, pure exponential backoff causes them to retry in lockstep — creating waves of load called a **thundering herd**. Adding jitter (randomizing the delay within a range) spreads retries out over time. See [Custom Strategies](#custom-strategies) for a `JitterBackoff` implementation.
+</Callout>
+
+---
+
+## Controlling What Gets Retried
+
+By default, the engine retries on `NetworkError` (connection refused, DNS failure, socket reset) and `TimeoutError`. It does not retry on HTTP error responses — those require an explicit `raise_for_status()` call and a custom `retry_on` predicate.
+
+Pass a `retry_on` callable to override this behavior. The function receives the exception and returns `True` to retry, `False` to raise immediately.
 
 ```python
-from axios_python import RetryStrategy
+from axios_python import HTTPStatusError, NetworkError, TimeoutError
 
-class JitterBackoff(RetryStrategy):
-    def get_delay(self, current_attempt: int) -> float:
-        import random
-        return random.uniform(0.5, 2.0)
-
-api.get("/url", max_retries=5, retry_strategy=JitterBackoff())
-```
-
-## Controlling *What* Gets Retried
-
-By default, the engine only retries if the transport raises a `NetworkError` or `TimeoutError`. It does not retry on `HTTPStatusError` (like 404 or 500) or exceptions raised by your own interceptors.
-
-You can customize this by passing a `retry_on` callable in your config. The callable takes an Exception and returns a boolean.
-
-```python
-from axios_python import HTTPStatusError, NetworkError
-
-def should_retry(exc):
-    # Retry on network failures AND 500-level status codes
-    if isinstance(exc, NetworkError):
+def should_retry(exc: Exception) -> bool:
+    # Always retry on transport failures
+    if isinstance(exc, (NetworkError, TimeoutError)):
         return True
+
+    # Retry on 429 (rate limited) and 5xx (server errors), not 4xx
     if isinstance(exc, HTTPStatusError):
-        return exc.response.status_code >= 500
+        return exc.response.status_code == 429 or exc.response.status_code >= 500
+
     return False
 
 api = axios_python.create({
+    "base_url": "https://api.example.com",
     "max_retries": 4,
-    "retry_on": should_retry
+    "retry_strategy": ExponentialBackoff(base=1.0, multiplier=2.0),
+    "retry_on": should_retry,
 })
+```
+
+<Callout type="note">
+  To retry on HTTP status codes, you must also ensure those responses raise an exception. Either configure your `retry_on` to call `response.raise_for_status()` internally, or use a response interceptor to raise `HTTPStatusError` before the retry engine evaluates it.
+</Callout>
+
+---
+
+## Custom Strategies
+
+Subclass `RetryStrategy` and implement `get_delay(attempt: int) -> float`. The `attempt` argument is 1-indexed — `1` on the first retry, `2` on the second, and so on.
+
+### Jitter Backoff
+
+Randomizes the delay within a range to prevent thundering herd problems when many clients retry simultaneously.
+
+```python
+import random
+from axios_python import RetryStrategy
+
+class JitterBackoff(RetryStrategy):
+    """Uniform random delay within [min_delay, max_delay]."""
+
+    def __init__(self, min_delay: float = 0.5, max_delay: float = 5.0):
+        self.min_delay = min_delay
+        self.max_delay = max_delay
+
+    def get_delay(self, attempt: int) -> float:
+        return random.uniform(self.min_delay, self.max_delay)
+
+
+api.get("/high-traffic-endpoint", max_retries=5, retry_strategy=JitterBackoff())
+```
+
+### Decorrelated Jitter
+
+A more sophisticated variant that tends to produce shorter average delays than exponential backoff while still avoiding lockstep retries. Popularized by [AWS Architecture Blog](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/).
+
+```python
+import random
+from axios_python import RetryStrategy
+
+class DecorrelatedJitter(RetryStrategy):
+    """
+    Decorrelated jitter: each delay is random between `base` and 3× the previous delay.
+    Produces shorter mean delays than full exponential while avoiding synchronization.
+    """
+
+    def __init__(self, base: float = 1.0, max_delay: float = 30.0):
+        self.base = base
+        self.max_delay = max_delay
+        self._last_delay = base
+
+    def get_delay(self, attempt: int) -> float:
+        delay = random.uniform(self.base, self._last_delay * 3)
+        self._last_delay = min(delay, self.max_delay)
+        return self._last_delay
+```
+
+---
+
+## Configuration Reference
+
+<TypeTable
+  type={{
+    max_retries: {
+      description: 'Maximum number of retry attempts before raising RetryError. Does not count the original attempt.',
+      type: 'int',
+      default: '0',
+    },
+    retry_strategy: {
+      description: 'Backoff strategy instance. Controls how long to wait between attempts.',
+      type: 'RetryStrategy',
+      default: 'FixedDelay(delay=0)',
+    },
+    retry_on: {
+      description: 'Predicate called with the raised exception. Return True to retry, False to raise immediately.',
+      type: '(exc: Exception) -> bool',
+      default: 'retries NetworkError and TimeoutError only',
+    },
+  }}
+/>
+
+---
+
+## Error Handling
+
+When all retry attempts are exhausted, the engine raises `RetryError`. The original exception that caused the final failure is available as `RetryError.__cause__`.
+
+```python
+import axios_python
+from axios_python import RetryError, NetworkError
+
+try:
+    api.get("/unreliable-endpoint")
+except RetryError as e:
+    print(f"All {api.config['max_retries']} attempts failed.")
+    print(f"Final error: {e.__cause__}")  # The underlying NetworkError or TimeoutError
 ```

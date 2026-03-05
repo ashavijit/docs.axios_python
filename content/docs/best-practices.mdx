@@ -14,11 +14,9 @@ When building production-ready applications, using HTTP clients securely, reliab
 While you can use the module-level methods (`axios_python.get()`), you should almost always create customized instances for different external services.
 
 ```python
-# BAD: Mixing configuration for different services globally
 axios_python.get("https://api.github.com/users", headers={"Authorization": "Bearer gh_token"})
 axios_python.post("https://api.stripe.com/charges", headers={"Authorization": "Bearer sk_token"})
 
-#  GOOD: Isolated client instances
 github = axios_python.create({
     "base_url": "https://api.github.com",
     "headers": {"Authorization": "Bearer gh_token", "Accept": "application/vnd.github.v3+json"}
@@ -29,7 +27,6 @@ stripe = axios_python.create({
     "headers": {"Authorization": "Bearer sk_token"}
 })
 
-# Now requests are clean
 github.get("/users/octocat")
 stripe.post("/charges", json={"amount": 2000, "currency": "usd"})
 ```
@@ -45,11 +42,8 @@ This ensures isolation:
 Network requests without timeouts can hang indefinitely, bringing down your application threads. `axios_python` defaults to a 30 second timeout.
 
 ```python
-# ❌ BAD: No explicit timeout or too long for a critical path
 api = axios_python.create({"base_url": "https://service.local"})
 
-# ✅ GOOD: Explicit, context-aware timeouts
-# E.g. 1 second for connect, 3 seconds for read
 api = axios_python.create({
     "base_url": "https://service.local",
     "timeout": 3.0 
@@ -67,9 +61,7 @@ from axios_python import ExponentialBackoff
 
 api = axios_python.create({
     "base_url": "https://api.thirdparty.com",
-    # Enable automatic retries
     "max_retries": 3,
-    # Use exponential backoff to avoid hammering the service
     "retry_strategy": ExponentialBackoff(base=1.0, multiplier=2.0)
 })
 ```

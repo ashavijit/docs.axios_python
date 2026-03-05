@@ -25,7 +25,6 @@ async def logger_middleware(config, next_fn):
     print(f"Starting {config.get('method')} to {config.get('url')}")
     start = time.monotonic()
     
-    # Yield control to the next layer
     result = await next_fn(config)
     
     elapsed = time.monotonic() - start
@@ -54,15 +53,12 @@ from axios_python import Response
 
 async def mock_router(config, next_fn):
     if config.get("url") == "/ping":
-        # Return an immediate mock response!
         return Response(status_code=200, headers={}, data="pong", request=None)
         
-    # Otherwise, pass it down the chain
     return await next_fn(config)
 
 api.use(mock_router)
 
-# Will never hit the network
 res = api.get("/ping")
 print(res.text) # "pong"
 ```

@@ -19,25 +19,18 @@ A request transformer gets access to two parameters: `data` and `headers`.
 import json
 from axios_python import create
 
-# A function to automatically convert payloads to protobufs
-# or complex nested dicts into properly serialized JSON strings
 def convert_to_json(data, headers):
     if isinstance(data, dict):
-        # We also have access to the headers dict mapped to the request
         headers["Content-Type"] = "application/json"
         
-        # We must return the transformed payload
         return json.dumps(data)
     
-    # Always fallback to returning data as-is if no transform occurs
     return data
 
-# Pass an array of transformer callables
 api = create({
     "transform_request": [convert_to_json]
 })
 
-# Under the hood, this payload is stringified.
 response = api.post("/users", data={"username": "octocat"})
 ```
 
@@ -53,18 +46,15 @@ A response transformer takes one argument: `data`.
 import base64
 from axios_python import create
 
-# A function mapping custom un-wrapping logic over all responses
 def unwrap_envelope_and_decode(data):
     if isinstance(data, dict):
         payload = data.get("internal_payload", data)
-        # Apply strict data manipulation
         if isinstance(payload, str):
             return base64.b64decode(payload).decode('utf-8')
         return payload
 
     return data
 
-# Register the response pipeline hook
 api = create({
     "base_url": "https://api.myapp.com",
     "transform_response": [unwrap_envelope_and_decode]

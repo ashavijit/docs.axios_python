@@ -28,10 +28,8 @@ You can use the module-level API for zero-setup requests, exactly like `requests
 ```python
 import axios_python
 
-# Make a simple GET request
 response = axios_python.get("https://httpbin.org/get", params={"query": "python"})
 
-# Check for success
 if response.ok:
     print(response.json())
 else:
@@ -54,7 +52,6 @@ api = axios_python.create({
     }
 })
 
-# Request to https://api.myapp.com/users
 response = api.get("/users")
 data = response.json()
 ```
@@ -70,7 +67,6 @@ import axios_python
 async def fetch_data():
     api = axios_python.create({"base_url": "https://httpbin.org"})
     
-    # Non-blocking async call
     response = await api.async_get("/delay/2")
     print(response.data)
 

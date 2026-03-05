@@ -5,99 +5,191 @@ date: 2026-03-03
 author: axios_python team
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+
 # Introducing axios_python
 
-We are incredibly excited to announce the release of **axios_python** v1.0!
+We are excited to announce the release of **axios_python v1.0** — a developer-experience-first HTTP client for Python, built natively on `httpx`.
 
-For years, the Python ecosystem has enjoyed some of the most robust, battle-tested HTTP libraries in the world. Libraries like `requests`, `httpx`, and `aiohttp` power millions of applications from simple scripts to massive distributed systems.
+Python has world-class HTTP transport libraries. `requests` is beloved for its simplicity. `httpx` brought modern async support and connection pooling. `aiohttp` powers high-throughput async workloads. These are excellent tools, and we use them ourselves.
 
-But as our applications grew in complexity, we found ourselves writing the same orchestration logic over and over again. We needed retries, we needed global request cancellation, we needed robust interceptors, and we needed unified synchronous and asynchronous interfaces.
+But as applications grow in complexity, transport alone is not enough. You need retries with configurable backoff. You need request interceptors for cross-cutting concerns like authentication. You need a middleware pipeline for tracing and observability. You need a unified interface that works identically in synchronous and asynchronous contexts. And when you need all of this across dozens of services, you need it to be composable — not copy-pasted.
 
-In the JavaScript world, [Axios](https://axios-http.com/) solved this problem beautifully. It wasn't just about sending requests; it was about managing the *lifecycle* of a request from end-to-end. We wanted that same elegant, developer-experience-first approach in Python.
+In the JavaScript world, [Axios](https://axios-http.com/) solved this problem cleanly. It treated the request not as a single send-and-receive operation, but as a *lifecycle* — something that could be observed, mutated, retried, cancelled, and extended. We wanted that same model in Python.
 
-So, we built it.
+So we built it.
 
-## The Problem with "Just Send It"
+---
 
-When you use a standard transport library, your code often looks like this:
+## The Problem with Raw Transport
+
+Consider a realistic production requirement: call an API with authentication, retry on transient failures with exponential backoff, and unwrap a standard response envelope.
+
+With a raw transport library, the code looks like this:
 
 ```python
 import httpx
 import time
 
-def fetch_data():
-    headers = {"Authorization": "Bearer token"}
-    
+def fetch_users():
+    headers = {"Authorization": f"Bearer {get_token()}"}
+
     for attempt in range(4):
         try:
-            response = httpx.get("https://api.example.com", headers=headers, timeout=5.0)
+            response = httpx.get(
+                "https://api.example.com/users",
+                headers=headers,
+                timeout=5.0,
+            )
             response.raise_for_status()
-            
+
             payload = response.json()
-            if "data" in payload:
-                return payload["data"]
-            return payload
-            
-        except httpx.RequestError as e:
-            if attempt == 3: raise e
+            return payload.get("data", payload)
+
+        except httpx.RequestError as exc:
+            if attempt == 3:
+                raise
             time.sleep(2 ** attempt)
 ```
 
-There's nothing "wrong" with this code, but it intertwines business logic with network resilience, authentication, and parsing. If you have 50 endpoints, you copy-paste this 50 times.
+There is nothing incorrect about this code. But it entangles business logic with network resilience, authentication, and response parsing. Multiply this pattern across 40 endpoints and you have 40 copies of the same retry loop, the same token injection, and the same envelope unwrapping — all drifting apart over time as each developer tweaks their version slightly differently.
 
-## The axios_python Solution
+The real cost is not the extra lines. It is the inconsistency, the maintenance burden, and the lack of a single place to change behavior globally.
 
-`axios_python` is built natively on top of `httpx`. It does not reinvent the core transport protocol. Instead, it provides the missing **orchestration layer**.
+---
 
-With `axios_python`, the exact same logic becomes:
+## The axios_python Approach
+
+`axios_python` does not replace `httpx` as a transport. It adds the **orchestration layer** that sits above transport — the layer that manages the request lifecycle end-to-end.
+
+The same requirements expressed with `axios_python`:
 
 ```python
 import axios_python
 from axios_python import ExponentialBackoff
 
-# Configure once
 api = axios_python.create({
     "base_url": "https://api.example.com",
-    "headers": {"Authorization": "Bearer token"},
     "timeout": 5.0,
     "max_retries": 3,
-    "retry_strategy": ExponentialBackoff(base=1.0, multiplier=2.0)
+    "retry_strategy": ExponentialBackoff(base=1.0, multiplier=2.0, max_delay=30.0),
 })
 
-# Unwrap data via an interceptor
-api.interceptors.response.use(lambda r: setattr(r, "data", r.json().get("data", r.data)) or r)
+# Token injection — runs before every request, once, for every endpoint
+api.interceptors.request.use(lambda config: {
+    **config,
+    "headers": {**config.get("headers", {}), "Authorization": f"Bearer {get_token()}"},
+})
 
-# Your business logic stays pristine
-def fetch_data():
-    return api.get("/").data
+# Envelope unwrapping — runs after every response
+api.interceptors.response.use(
+    lambda r: setattr(r, "data", r.json().get("data", r.data)) or r
+)
+
+def fetch_users():
+    return api.get("/users").data
 ```
 
-## First-Class Async Support
+Authentication, retries, and response normalization are each defined once. Every endpoint on this client inherits them automatically. To change retry behavior across the entire application, you change one line.
 
-We designed `axios_python` to unify Sync and Async development. If you are migrating a legacy Django application to FastAPI, or writing a library that has to support both paradigms, you no longer need two massive copy-pasted classes.
+---
+
+## Unified Sync and Async
+
+One of the more frustrating problems in Python HTTP clients is the sync/async split. `requests` is synchronous only. `aiohttp` is asynchronous only. `httpx` supports both but exposes two distinct client classes (`Client` and `AsyncClient`) with different APIs.
+
+`axios_python` exposes a single instance with an identical interface for both paradigms. Every method has a direct async equivalent, prefixed with `async_`.
+
+<Tabs items={["Synchronous", "Asynchronous"]}>
+<Tab value="Synchronous">
+```python
+# Blocking — works in scripts, Django views, CLI tools
+response = api.get("/users")
+user = api.post("/users", json={"name": "Ada"})
+```
+</Tab>
+<Tab value="Asynchronous">
+```python
+# Non-blocking — works in FastAPI, asyncio scripts, async workers
+response = await api.async_get("/users")
+user = await api.async_post("/users", json={"name": "Ada"})
+```
+</Tab>
+</Tabs>
+
+The same instance, the same config, the same interceptors and middleware — regardless of which you call. If you are migrating a Django application to FastAPI incrementally, or writing a library that must support both paradigms, you no longer need two diverging implementations.
+
+---
+
+## Middleware for Deep Observability
+
+Interceptors handle request and response mutation. For logic that needs to wrap the *entire* transport call — measuring latency, injecting trace IDs, implementing circuit breakers — `axios_python` provides an async middleware pipeline modelled after Express.js.
 
 ```python
-# Synchronous
-response = api.get("/users")
+import time
+import uuid
 
-# Asynchronous (uses the exact same interceptors, middleware, and config!)
-response = await api.async_get("/users")
+async def trace_middleware(ctx, next_fn):
+    trace_id = str(uuid.uuid4())
+    ctx["headers"]["X-Trace-Id"] = trace_id
+    return await next_fn(ctx)
+
+async def timing_middleware(ctx, next_fn):
+    start = time.monotonic()
+    result = await next_fn(ctx)
+    elapsed = (time.monotonic() - start) * 1000
+    log.info("request completed", url=ctx["url"], status=result.status_code, ms=elapsed)
+    return result
+
+api.use(trace_middleware)
+api.use(timing_middleware)
 ```
 
-## What's Next?
+Every request passes through middleware in registration order. Calling `await next_fn(ctx)` hands control to the next layer. Everything before that call runs on the way *in*; everything after runs on the way *out*.
 
-We consider v1.0 to be feature-complete for the core orchestration layer. Our focus moving forward will be on:
+<Callout type="note">
+  Middleware runs for every request on the instance — including retried attempts. This makes it the right place to measure true end-to-end latency, inclusive of retries.
+</Callout>
 
-1. **Expanding the Plugin Ecosystem:** (Official integrations for Redis caching, AWS SigV4 auth, OpenTelemetry tracing).
-2. **Framework Integrations:** First-party lifecycle hooks for FastAPI and Starlette.
-3. **Performance Optimization:** Ensuring the middleware pipeline adds zero measurable overhead to the underlying `httpx` transport.
+---
 
-Try it out today! 
+## A Plugin for Everything Else
+
+For capabilities that don't belong in the request pipeline at all — caching, auth token management, structured logging — `axios_python` ships a plugin system.
+
+```python
+from axios_python import AuthPlugin, CachePlugin, LoggerPlugin
+
+api.plugin(AuthPlugin(scheme="Bearer", token_provider=vault.get_token))
+api.plugin(CachePlugin(ttl=60, max_size=512))
+api.plugin(LoggerPlugin(level=logging.INFO))
+```
+
+Plugins are registered once and apply to all requests on the instance. They are composable: stack as many as needed in any order.
+
+---
+
+## What's Next
+
+We consider v1.0 feature-complete for the core orchestration layer. Our roadmap beyond this release:
+
+**Plugin ecosystem.** Official integrations for Redis-backed caching, AWS SigV4 authentication, and OpenTelemetry distributed tracing are in active development.
+
+**Framework integrations.** First-party lifecycle hooks for FastAPI and Starlette — so `axios_python` instances can be managed as application-scoped dependencies with proper startup and shutdown handling.
+
+**Performance.** We are profiling the middleware pipeline to ensure it adds no measurable overhead on top of the underlying `httpx` transport. Benchmarks and results will be published openly.
+
+---
+
+## Get Started
 
 ```bash
 pip install axios_python
 ```
 
-We can't wait to see what you build.
+Full documentation, guides, and API reference are available at [/docs](/docs).
 
-*— The axios_python Team*
+If you run into anything unexpected, [open an issue](https://github.com/ashavijit/pyxios/issues). If you build something with it, we would genuinely love to hear about it.
+
+*— ashavijit*

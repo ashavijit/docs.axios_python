@@ -8,81 +8,166 @@ author: axios_python team
 import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
 import { Callout } from 'fumadocs-ui/components/callout';
 
-# The Challenge of Async vs Sync in Python
+# Two Clients Walk Into a Codebase
 
-Python's transition into the asynchronous world over the last decade has been nothing short of revolutionary. Frameworks like FastAPI and Starlette have proven that Python can be blistering fast when handling high-concurrency I/O operations.
+Here is a situation every Python developer has lived through at least once.
 
-However, this transition has fractured the ecosystem. 
+You find a nice HTTP library. Clean API, good docs, sensible defaults. You build your SDK around it. Then a user opens an issue: *"Does this support async?"* You check. It does not. So you do what any reasonable person does — you write a second version of your SDK. Same methods, same logic, same edge cases, different class name. `GitHubClient` and `AsyncGitHubClient` are born, and they will haunt you for the rest of the project's life.
 
-Libraries either:
-1. Support only synchronous execution (like `requests`).
-2. Support only asynchronous execution (like `aiohttp`).
-3. Support both, but require completely different API surfaces and underlying connection pools (like `httpx.Client` vs `httpx.AsyncClient`).
+This is not a niche problem. It is one of the most common sources of maintenance pain in the Python HTTP ecosystem today.
 
-## The Problem for Library Authors
+---
 
-If you are writing an SDK for a third-party API (let's say, a Stripe or GitHub API wrapper), you are faced with a difficult choice. Do you force your users to use Async? Do you force them to use Sync? 
+## How We Got Here
 
-Most library authors end up writing two identical classes:
+Python's async story is genuinely good now. `asyncio` is stable, FastAPI and Starlette have made async web development feel natural, and `httpx` proved that a library can support both paradigms at the transport level. But "support both" has typically meant "ship two separate clients":
+
+- `requests` — synchronous only, no async story
+- `aiohttp` — asynchronous only, sync is an afterthought
+- `httpx` — both, but via `httpx.Client` and `httpx.AsyncClient` as distinct classes with separate connection pools and lifecycle management
+
+The third option is the most interesting and the most frustrating. `httpx` does the right thing at the transport layer but leaves the unification problem entirely to you. If you build an SDK on top of it, you still end up with two classes and two test suites, because the API surfaces are different enough that sharing code between them gets awkward fast.
+
+Here is what that looks like in practice:
 
 ```python
 import httpx
 
 class GitHubClient:
-    def get_user(self, username: str):
-        with httpx.Client() as client:
+    def get_user(self, username: str) -> dict:
+        with httpx.Client(base_url="https://api.github.com") as client:
             return client.get(f"/users/{username}").json()
 
+    def list_repos(self, username: str) -> list:
+        with httpx.Client(base_url="https://api.github.com") as client:
+            return client.get(f"/users/{username}/repos").json()
+
+
 class AsyncGitHubClient:
-    async def get_user(self, username: str):
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"/users/{username}")
-            return response.json()
+    async def get_user(self, username: str) -> dict:
+        async with httpx.AsyncClient(base_url="https://api.github.com") as client:
+            return (await client.get(f"/users/{username}")).json()
+
+    async def list_repos(self, username: str) -> list:
+        async with httpx.AsyncClient(base_url="https://api.github.com") as client:
+            return (await client.get(f"/users/{username}/repos")).json()
 ```
 
-This is a maintenance nightmare. Every new endpoint, every new middleware, every new retry logic has to be implemented and tested twice.
+Two classes, four methods, zero lines of shared logic. Now add authentication, retries, response normalization, and rate limiting — and implement all of it twice. Then keep both implementations in sync as the API evolves. Then explain in your README which class to use and why.
 
-## The `axios_python` Philosophy
+It works. It is just quietly exhausting.
 
-With `axios_python`, we decided that **the developer experience should be identical** regardless of the environment. 
+---
 
-A single `axios_python` instance holds all of your configuration: base URLs, headers, timeout settings, retry strategies, and the entire middleware/interceptor pipeline. 
+## One Instance to Rule Them All
+
+`axios_python` takes a different position: the execution context is a detail, not an identity. Sync and async are not different *things* — they are different *call sites* for the same operation.
+
+A single `axios_python` instance holds everything: the base URL, default headers, timeout settings, retry strategy, interceptors, and middleware pipeline. You create it once, configure it once, and then choose at the call site whether you want a blocking or non-blocking response.
 
 <Tabs items={["Synchronous", "Asynchronous"]}>
 <Tab value="Synchronous">
 ```python
 import axios_python
 
-api = axios_python.create({"base_url": "https://api.github.com"})
+api = axios_python.create({
+    "base_url": "https://api.github.com",
+    "headers": {"Authorization": "Bearer token"},
+})
 
-# Standard sync request
-response = api.get("/users/octocat")
+# Blocking. Works great in Django, scripts, CLI tools.
+user = api.get("/users/octocat").json()
+repos = api.get("/users/octocat/repos").json()
 ```
 </Tab>
 <Tab value="Asynchronous">
 ```python
 import axios_python
 
-api = axios_python.create({"base_url": "https://api.github.com"})
+api = axios_python.create({
+    "base_url": "https://api.github.com",
+    "headers": {"Authorization": "Bearer token"},
+})
 
-# Standard async request
-response = await api.async_get("/users/octocat")
+# Non-blocking. Drops straight into FastAPI routes or asyncio workers.
+user = (await api.async_get("/users/octocat")).json()
+repos = (await api.async_get("/users/octocat/repos")).json()
 ```
 </Tab>
 </Tabs>
 
-### How it Works Under the Hood
+Same instance. Same config object. Same interceptors already registered on it. The only thing that changed was the method name.
 
-When you call `api.get()`, `axios_python` runs the request through the synchronous pipeline. When you call `api.async_get()`, it runs the exact same request configuration through the asynchronous pipeline.
+---
 
-<Callout title="Wait, what about Interceptors?" type="info">
-`axios_python` natively detects if an interceptor or middleware is defined as `async def` or a regular `def`. If you are running an asynchronous request, it will flawlessly `await` your async middlewares alongside your sync ones. If you try to run an async middleware in a synchronous request, it will safely execute it in a local event loop automatically!
+## What Happens in the Middle
+
+Under the hood, `api.get()` routes through a synchronous pipeline backed by `httpx.Client`. `api.async_get()` routes through an asynchronous pipeline backed by `httpx.AsyncClient`. They share configuration state; they differ only in how they execute the transport call.
+
+The interesting part is what happens to your interceptors and middleware when you switch contexts. `axios_python` inspects each function at registration time to determine whether it is a regular `def` or an `async def`, then executes it appropriately for the current pipeline.
+
+<Callout type="info" title="Mixing sync and async interceptors">
+  Register a synchronous interceptor and call `api.async_get()`? It runs normally inside the async pipeline. Register an `async def` interceptor and call the synchronous `api.get()`? `axios_python` runs it in a locally managed event loop — no changes required from you. Write your interceptors in whatever style matches your project; `axios_python` handles the context.
 </Callout>
 
-This means if you write a custom Logging interceptor, you write it **once** and it works perfectly for both your Django (Sync) and FastAPI (Async) users out of the box.
+In practice, this means a token refresh interceptor, a response normalizer, or a structured logging middleware written once will work identically for your Django users and your FastAPI users. No forks, no `if asyncio.get_event_loop().is_running()` gymnastics, no version flags.
+
+---
+
+## The SDK Collapses to One Class
+
+Going back to the GitHub SDK example — here is what it looks like built on `axios_python`:
+
+```python
+import axios_python
+from axios_python import ExponentialBackoff
+
+class GitHubClient:
+    def __init__(self, token: str):
+        self._api = axios_python.create({
+            "base_url": "https://api.github.com",
+            "timeout": 10.0,
+            "max_retries": 3,
+            "retry_strategy": ExponentialBackoff(base=0.5, multiplier=2.0),
+            "headers": {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+            },
+        })
+
+    def get_user(self, username: str) -> dict:
+        return self._api.get(f"/users/{username}").json()
+
+    def list_repos(self, username: str) -> list:
+        return self._api.get(f"/users/{username}/repos").json()
+
+    async def async_get_user(self, username: str) -> dict:
+        return (await self._api.async_get(f"/users/{username}")).json()
+
+    async def async_list_repos(self, username: str) -> list:
+        return (await self._api.async_get(f"/users/{username}/repos")).json()
+```
+
+One class. One constructor. One place where auth headers, timeouts, and retry logic live. The async methods are thin wrappers around the same underlying configuration — not a parallel implementation of it. Adding a new endpoint means adding two methods, each a single line. That's the entire cost.
+
+---
+
+## When to Reach for Which
+
+The choice between sync and async in `axios_python` follows the same rules as anywhere else in Python — it is about your application's runtime, not the library's capabilities.
+
+Reach for the synchronous methods when you are writing CLI tools, background jobs, Django views, or data scripts. The call stack is linear and easy to trace, and there is no event loop to reason about.
+
+Reach for the async methods when you are in FastAPI route handlers, Starlette middleware, or any `asyncio`-based worker where blocking the event loop would hurt throughput.
+
+The important thing is that the decision is reversible. Migrating a Django application to FastAPI incrementally? Your `axios_python` instance stays exactly the same. You change the method names at the call sites, and you are done.
+
+---
 
 ## Summary
 
-We believe that switching between Sync and Async contexts shouldn't require learning two different libraries or managing two different sets of connection pools. 
+Python's async ecosystem is mature and production-ready. The remaining friction is not in the runtime — it is in the library layer, where sync and async have historically meant two separate things to maintain.
 
-`axios_python` unifies the experience, allowing you to easily build SDKs, microservices, and scripts that work seamlessly anywhere.
+`axios_python` treats them as one thing. One instance, one configuration, one interceptor pipeline. The execution context is a choice you make at the call site.
+
+That's it. That is the whole idea.

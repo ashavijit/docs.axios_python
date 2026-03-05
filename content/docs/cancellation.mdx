@@ -25,17 +25,14 @@ token = CancelToken()
 
 def background_fetch():
     try:
-        # Pass the token down to the request
         axios_python.get("https://httpbin.org/delay/10", cancel_token=token)
     except axios_python.CancelError as e:
         print(f"Request aborted: {e}")
 
-# Start the download in a background thread
 threading.Thread(target=background_fetch).start()
 
 time.sleep(1)
 
-# Main thread decides to cancel the request
 token.cancel(reason="User clicked 'Stop'")
 ```
 
@@ -49,12 +46,10 @@ import axios_python
 async def main():
     token = CancelToken()
     
-    # Fire off the slow request without waiting
     task = asyncio.create_task(
         axios_python.async_get("https://.../heavy-download", cancel_token=token)
     )
     
-    # Wait half a second, then cancel
     await asyncio.sleep(0.5)
     token.cancel("Took too long!")
     
