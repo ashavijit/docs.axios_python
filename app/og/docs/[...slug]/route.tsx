@@ -113,7 +113,8 @@ function OGImage({ title, description }: { title: string; description?: string }
           <div
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '4px 14px', borderRadius: 999, width: 'fit-content',
+              padding: '4px 14px', borderRadius: 999,
+              alignSelf: 'flex-start',
               border: '1px solid rgba(99,102,241,0.4)',
               background: 'rgba(99,102,241,0.1)',
             }}
