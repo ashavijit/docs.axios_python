@@ -1,0 +1,74 @@
+---
+title: "Data Transformation"
+description: "Modify request data and headers prior to transmission or parsing."
+---
+
+# Data Transformation
+
+`axios_python` provides two hooks specifically designed to format data before it hits the network and immediately after the response is received.
+
+Unlike [Interceptors](/docs/interceptors) which are meant to alter the overall configuration (like adding auth tokens or mapping full objects), **Data Transformers** focus strictly on the request `data`/`headers` and the raw response `data`.
+
+## `transform_request`
+
+The `transform_request` pipeline modifies the payload immediately before it goes out onto the network wire. This is especially useful for custom serialization schemas.
+
+A request transformer gets access to two parameters: `data` and `headers`.
+
+```python
+import json
+from axios_python import create
+
+# A function to automatically convert payloads to protobufs
+# or complex nested dicts into properly serialized JSON strings
+def convert_to_json(data, headers):
+    if isinstance(data, dict):
+        # We also have access to the headers dict mapped to the request
+        headers["Content-Type"] = "application/json"
+        
+        # We must return the transformed payload
+        return json.dumps(data)
+    
+    # Always fallback to returning data as-is if no transform occurs
+    return data
+
+# Pass an array of transformer callables
+api = create({
+    "transform_request": [convert_to_json]
+})
+
+# Under the hood, this payload is stringified.
+response = api.post("/users", data={"username": "octocat"})
+```
+
+If multiple transformers are passed in the list, they execute sequentially in the exact order provided, with each step passing its result to the next.
+
+## `transform_response`
+
+Conversely, `transform_response` allows you to modify the incoming `Response.data` payload directly before the instance hands control back to your business logic or response interceptors.
+
+A response transformer takes one argument: `data`.
+
+```python
+import base64
+from axios_python import create
+
+# A function mapping custom un-wrapping logic over all responses
+def unwrap_envelope_and_decode(data):
+    if isinstance(data, dict):
+        payload = data.get("internal_payload", data)
+        # Apply strict data manipulation
+        if isinstance(payload, str):
+            return base64.b64decode(payload).decode('utf-8')
+        return payload
+
+    return data
+
+# Register the response pipeline hook
+api = create({
+    "base_url": "https://api.myapp.com",
+    "transform_response": [unwrap_envelope_and_decode]
+})
+```
+
+The response transformer executes *after* standard httpx JSON paring is attempted, meaning if the API returns valid JSON, `data` inside the transformer will be the initialized dictionary natively.

@@ -39,7 +39,7 @@ You can pass the following properties to `axios_python.create(config)` (as defau
 | Property | Type | Description |
 |----------|------|-------------|
 | `base_url` | `str` | Base URL attached to relative paths. |
-| `method` | `str` | HTTP Method (e.g., `"GET"`, `"POST"`). |
+| `method` | `str` | HTTP Method (e.g., `"GET"`, `"POST"`, `"HEAD"`, `"OPTIONS"`). |
 | `url` | `str` | The target path or absolute URL. |
 | `headers` | `dict` | Dictionary of HTTP headers. |
 | `params` | `dict` | URL Query parameters. |
@@ -48,6 +48,9 @@ You can pass the following properties to `axios_python.create(config)` (as defau
 | `files` | `Any` | Multipart-encoded files dictionary. |
 | `stream` | `bool` | Stream the response (Default: False). |
 | `timeout` | `float` | Max seconds to wait for a response (Default: 30). |
+| `follow_redirects` | `bool` | Whether to automatically follow HTTP redirects (Default: True). |
+| `transform_request` | `list[Callable]`| Functions to manipulate data/headers before sending. |
+| `transform_response` | `list[Callable]`| Functions to manipulate response data before returning. |
 | `max_retries` | `int` | Maximum retry attempts on failure (Default: 0). |
 | `retry_strategy` | `RetryStrategy` | Backoff class instance (e.g., `ExponentialBackoff`). |
 | `retry_on` | `Callable` | Predicate function taking an Exception and returning bool. |
@@ -62,6 +65,8 @@ All instances (and the top-level module) support the following synchronous metho
 - `put(url, **kwargs)`
 - `patch(url, **kwargs)`
 - `delete(url, **kwargs)`
+- `head(url, **kwargs)`
+- `options(url, **kwargs)`
 
 And their asynchronous equivalents:
 - `async_request(method, url, **kwargs)`
@@ -70,3 +75,5 @@ And their asynchronous equivalents:
 - `async_put(url, **kwargs)`
 - `async_patch(url, **kwargs)`
 - `async_delete(url, **kwargs)`
+- `async_head(url, **kwargs)`
+- `async_options(url, **kwargs)`
