@@ -8,7 +8,7 @@ import Beams from '@/components/Beams';
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/60 px-3 py-1 text-xs font-medium text-zinc-500 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
+    <div className="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white/60 px-3 py-1 text-xs font-medium text-zinc-500 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
       {children}
     </div>
   );
@@ -49,7 +49,7 @@ const K = ({ c }: { c: string }) => <span style={{ color: c }} />;
 function FeatureCard({ icon, title, description, accent = '#52525b' }: { icon: React.ReactNode; title: string; description: string; accent?: string }) {
   return (
     <div
-      className="group relative flex flex-col gap-5 overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-800/80 dark:bg-zinc-900/40"
+      className="group relative flex flex-col gap-5 overflow-hidden rounded-lg border border-zinc-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-800/80 dark:bg-zinc-900/40"
       style={{ '--accent': accent } as React.CSSProperties}
     >
       {/* top accent line */}
@@ -59,7 +59,7 @@ function FeatureCard({ icon, title, description, accent = '#52525b' }: { icon: R
       />
 
       <div
-        className="flex h-10 w-10 items-center justify-center rounded-xl text-white transition-transform duration-300 group-hover:scale-110"
+        className="flex h-10 w-10 items-center justify-center rounded-md text-white transition-transform duration-300 group-hover:scale-110"
         style={{ background: `linear-gradient(135deg, ${accent}22, ${accent}44)`, color: accent }}
       >
         {icon}
@@ -79,8 +79,8 @@ function FeatureCard({ icon, title, description, accent = '#52525b' }: { icon: R
 
 function CompareCard({ label, code, good }: { label: string; code: string; good: boolean }) {
   return (
-    <div className={`relative overflow-hidden rounded-2xl border p-5 ${good ? 'border-blue-200 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-950/20' : 'border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/30'}`}>
-      <div className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${good ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-zinc-200/80 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+    <div className={`relative overflow-hidden rounded-lg border p-5 ${good ? 'border-blue-200 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-950/20' : 'border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/30'}`}>
+      <div className={`mb-3 inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-semibold ${good ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-zinc-200/80 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
         {good ? '✦ axios_python' : 'Before'}
       </div>
       <pre className="overflow-x-auto font-mono text-[12px] leading-relaxed text-zinc-700 dark:text-zinc-300">{code}</pre>
@@ -220,10 +220,10 @@ export default function HomePage() {
             CODE SHOWCASE
         ══════════════════════════════════════ */}
         <section className="animate-in delay-500 relative z-20 w-full max-w-4xl px-6 pt-20 pb-12 md:pt-28">
-          <div className="floating relative rounded-3xl border border-zinc-200/60 bg-white/40 p-2 shadow-2xl shadow-zinc-300/30 backdrop-blur-2xl dark:border-white/8 dark:bg-zinc-950/40 dark:shadow-black/60">
+          <div className="floating relative rounded-xl border border-zinc-200/60 bg-white/40 p-2 shadow-2xl shadow-zinc-300/30 backdrop-blur-2xl dark:border-white/8 dark:bg-zinc-950/40 dark:shadow-black/60">
 
             {/* Window chrome */}
-            <div className="relative overflow-hidden rounded-2xl border border-zinc-200/50 bg-[#0d1117] dark:border-white/5">
+            <div className="relative overflow-hidden rounded-lg border border-zinc-200/50 bg-[#0d1117] dark:border-white/5">
               <div className="flex items-center justify-between border-b border-white/8 bg-white/4 px-4 py-3">
                 <div className="flex gap-1.5">
                   <div className="h-2.5 w-2.5 rounded-full bg-[#ff5f56]" />
@@ -235,33 +235,46 @@ export default function HomePage() {
               </div>
 
               {/* Code */}
-              <div className="font-code overflow-x-auto p-7 text-[13px] leading-7 text-zinc-300 sm:p-9 sm:text-[14px]">
-                <pre>{``}<span className="text-[#ff7b72]">import</span> <span className="text-[#79c0ff]">axios_python</span>
-                  {`
-`}<span className="text-[#8b949e]"># Create a reusable, configured client</span>
-                  {`api = axios_python.create({
-    `}<span className="text-[#a5d6ff]">"base_url"</span>{`:    `}<span className="text-[#a5d6ff]">"https://api.github.com"</span>,
-                  <span className="text-[#a5d6ff]">"timeout"</span>{`:     `}<span className="text-[#79c0ff]">5.0</span>,
-                  <span className="text-[#a5d6ff]">"max_retries"</span>{`: `}<span className="text-[#79c0ff]">3</span>,
-                  {`})
-
-`}<span className="text-[#8b949e]"># Identical API surface for sync & async</span>
-                  {`async `}<span className="text-[#ff7b72]">def</span> <span className="text-[#d2a8ff]">get_repos</span>{`(username: `}<span className="text-[#ff7b72]">str</span>{`) -> `}<span className="text-[#ff7b72]">list</span>{`:
-    resp = `}<span className="text-[#ff7b72]">await</span>{` api.async_get(`}<span className="text-[#a5d6ff]">f"/users/{'{username}'}/repos"</span>{`)
-    resp.raise_for_status()
-    `}<span className="text-[#ff7b72]">return</span>{` resp.json()
-
-`}<span className="text-[#8b949e]"># Middleware: attach auth on every request</span>
-                  {`api.use(`}<span className="text-[#ff7b72]">lambda</span>{` req: req.set_header(
-    `}<span className="text-[#a5d6ff]">"Authorization"</span>{`, `}<span className="text-[#a5d6ff]">f"Bearer {'{TOKEN}'}"</span>
-                  {`))
-`}</pre>
+              <div className="font-code overflow-x-auto p-6 text-[13px] leading-7 text-zinc-300 sm:p-8 sm:text-[14px]">
+                <pre><code>{[
+                  <span key="l1"><span className="text-[#ff7b72]">import</span> <span className="text-[#79c0ff]">axios_python</span></span>,
+                  '\n',
+                  <span key="l2" className="text-[#8b949e]"># Create a reusable, configured client</span>,
+                  '\n',
+                  <span key="l3">{'api = axios_python.create({'}</span>,
+                  '\n',
+                  <span key="l4">{'    '}<span className="text-[#a5d6ff]">"base_url"</span>:    <span className="text-[#a5d6ff]">"https://api.github.com"</span>,</span>,
+                  '\n',
+                  <span key="l5">{'    '}<span className="text-[#a5d6ff]">"timeout"</span>:     <span className="text-[#79c0ff]">5.0</span>,</span>,
+                  '\n',
+                  <span key="l6">{'    '}<span className="text-[#a5d6ff]">"max_retries"</span>: <span className="text-[#79c0ff]">3</span>,</span>,
+                  '\n',
+                  <span key="l7">{'})'}</span>,
+                  '\n\n',
+                  <span key="l8" className="text-[#8b949e]"># Identical API surface for sync &amp; async</span>,
+                  '\n',
+                  <span key="l9"><span className="text-[#ff7b72]">async</span> <span className="text-[#ff7b72]">def</span> <span className="text-[#d2a8ff]">get_repos</span>{'(username: '}<span className="text-[#ff7b72]">str</span>{') -> '}<span className="text-[#ff7b72]">list</span>:</span>,
+                  '\n',
+                  <span key="l10">{'    resp = '}<span className="text-[#ff7b72]">await</span>{' api.async_get('}<span className="text-[#a5d6ff]">f"/users/{'{username}'}/repos"</span>{')'}</span>,
+                  '\n',
+                  <span key="l11">{'    resp.raise_for_status()'}</span>,
+                  '\n',
+                  <span key="l12">{'    '}<span className="text-[#ff7b72]">return</span>{' resp.json()'}</span>,
+                  '\n\n',
+                  <span key="l13" className="text-[#8b949e]"># Middleware: attach auth on every request</span>,
+                  '\n',
+                  <span key="l14">{'api.use('}<span className="text-[#ff7b72]">lambda</span>{' req: req.set_header('}</span>,
+                  '\n',
+                  <span key="l15">{'    '}<span className="text-[#a5d6ff]">"Authorization"</span>{', '}<span className="text-[#a5d6ff]">f"Bearer {'{TOKEN}'}"</span></span>,
+                  '\n',
+                  <span key="l16">{'))'}</span>,
+                ]}</code></pre>
               </div>
 
               {/* Bottom bar with subtle pill badges */}
-              <div className="flex items-center gap-3 border-t border-white/6 bg-white/2 px-7 py-3">
+              <div className="flex items-center gap-3 border-t border-white/6 bg-white/2 px-6 py-3">
                 {['Python 3.10+', 'httpx', 'fully typed'].map((t) => (
-                  <span key={t} className="font-code rounded-full border border-white/10 px-2.5 py-0.5 text-[11px] text-zinc-500">
+                  <span key={t} className="font-code rounded border border-white/10 px-2.5 py-0.5 text-[11px] text-zinc-500">
                     {t}
                   </span>
                 ))}
@@ -371,7 +384,7 @@ async def fetch(path):
             CTA FOOTER BANNER
         ══════════════════════════════════════ */}
         <section className="relative z-10 w-full max-w-5xl px-6 pb-32">
-          <div className="relative overflow-hidden rounded-3xl border border-zinc-200/80 bg-white p-12 text-center shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/50">
+          <div className="relative overflow-hidden rounded-xl border border-zinc-200/80 bg-white p-12 text-center shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/50">
             {/* Glow blob */}
             <div
               aria-hidden
