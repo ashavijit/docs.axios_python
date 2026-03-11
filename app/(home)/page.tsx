@@ -97,10 +97,10 @@ export default function HomePage() {
     <>
       <style>{`
         @import url('https://api.fontshare.com/v2/css?f[]=haskoy@400,500,600,700,800,900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap');
 
         .font-display { font-family: 'Haskoy', sans-serif; }
-        .font-code    { font-family: 'JetBrains Mono', monospace; }
+        .font-code    { font-family: 'DM Mono', monospace; }
 
         @keyframes float {
           0%, 100% { transform: translateY(0px);  }

@@ -1,6 +1,7 @@
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import './global.css';
 import localFont from 'next/font/local';
+import { DM_Mono } from 'next/font/google';
 
 const domaine = localFont({
   src: '../fonts/d.otf',
@@ -10,6 +11,12 @@ const domaine = localFont({
 const haskoy = localFont({
   src: '../fonts/Haskoy.ttf',
   variable: '--font-haskoy',
+});
+
+const dmMono = DM_Mono({
+  weight: ['400', '500'],
+  subsets: ['latin'],
+  variable: '--font-dm-mono',
 });
 
 export const metadata = {
@@ -36,7 +43,7 @@ export const metadata = {
 
 export default function Layout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={`${haskoy.variable} ${domaine.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${haskoy.variable} ${domaine.variable} ${dmMono.variable}`} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen font-sans">
         <RootProvider>{children}</RootProvider>
       </body>
